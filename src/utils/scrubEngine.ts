@@ -113,7 +113,7 @@ export function scrubText(text: string, rules: ScrubRuleOptions = DEFAULT_RULES)
     try {
       const customReg = new RegExp(rules.customRegex.trim(), 'g');
       scrubbed = scrubbed.replace(customReg, (m) => replaceMatch(m, 'CUSTOM'));
-    } catch {
+    } catch (_err) {
       // Ignore invalid regex silently
     }
   }
