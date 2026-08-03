@@ -5,7 +5,7 @@ import { OnboardingFlow } from './components/OnboardingFlow';
 
 export function App() {
   return (
-    <div className="min-h-screen bg-slate-950 text-white antialiased">
+    <div className="min-h-screen bg-[#040b14] text-white antialiased selection:bg-emerald-400 selection:text-slate-950">
       <LandingPage />
       <OnboardingFlow />
       <FounderStory />

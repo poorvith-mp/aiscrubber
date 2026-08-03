@@ -1,4 +1,6 @@
-import React from 'react';
+import React, { useRef } from 'react';
+import { useGSAP } from '@gsap/react';
+import gsap from 'gsap';
 import {
   ArrowRight,
   BarChart3,
@@ -42,21 +44,46 @@ const pillars = [
 ];
 
 export const LandingPage: React.FC = () => {
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useGSAP(() => {
+    const ctx = gsap.context(() => {
+      gsap.from('.fade-up', {
+        opacity: 0,
+        y: 28,
+        duration: 0.8,
+        stagger: 0.12,
+        ease: 'power3.out',
+      });
+
+      gsap.to('.floating-card', {
+        y: -10,
+        duration: 2.5,
+        repeat: -1,
+        yoyo: true,
+        ease: 'sine.inOut',
+        stagger: 0.2,
+      });
+    }, rootRef);
+
+    return () => ctx.revert();
+  }, []);
+
   return (
-    <div className="bg-slate-950 text-white">
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
+    <div ref={rootRef} className="bg-[#040b14] text-white">
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#040b14]/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
-          <div className="flex items-center gap-3">
+          <div className="fade-up flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20 ring-1 ring-emerald-400/40">
               <Sparkles className="h-5 w-5 text-emerald-300" />
             </div>
             <div>
-              <div className="text-lg font-semibold tracking-tight">AIscrubber</div>
+              <div className="text-lg font-semibold tracking-tight text-white">AIscrubber</div>
               <div className="text-[10px] uppercase tracking-[0.28em] text-slate-400">Privacy by default</div>
             </div>
           </div>
 
-          <nav className="hidden items-center gap-8 text-sm text-slate-300 md:flex">
+          <nav className="fade-up hidden items-center gap-8 text-sm text-slate-300 md:flex">
             <a href="#features" className="transition hover:text-white">Features</a>
             <a href="#onboarding" className="transition hover:text-white">Onboarding</a>
             <a href="#founder" className="transition hover:text-white">Founder</a>
@@ -64,7 +91,7 @@ export const LandingPage: React.FC = () => {
 
           <a
             href="#onboarding"
-            className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/25"
+            className="fade-up inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/25"
           >
             Get started
             <ArrowRight className="h-4 w-4" />
@@ -77,21 +104,21 @@ export const LandingPage: React.FC = () => {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.22),transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.18),transparent_30%)]" />
           <div className="relative mx-auto grid max-w-7xl gap-12 px-6 py-20 lg:grid-cols-[1.2fr_0.8fr] lg:px-8 lg:py-24">
             <div>
-              <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-200">
+              <div className="fade-up mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-200">
                 <ShieldCheck className="h-3.5 w-3.5" />
                 Zero-trust AI privacy workflow
               </div>
 
-              <h1 className="max-w-xl text-5xl font-black tracking-tight text-white sm:text-6xl">
+              <h1 className="fade-up max-w-xl text-5xl font-black tracking-tight text-white sm:text-6xl">
                 Clean data before it ever reaches AI.
               </h1>
 
-              <p className="mt-6 max-w-xl text-lg text-slate-300">
+              <p className="fade-up mt-6 max-w-xl text-lg text-slate-300">
                 AIscrubber helps teams scrub sensitive details from prompts, logs, and records before they are sent to LLMs.
                 No auth, no backend, and no compromise on privacy.
               </p>
 
-              <div className="mt-8 flex flex-wrap gap-4">
+              <div className="fade-up mt-8 flex flex-wrap gap-4">
                 <a
                   href="#onboarding"
                   className="inline-flex items-center gap-2 rounded-full bg-emerald-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300"
@@ -107,7 +134,7 @@ export const LandingPage: React.FC = () => {
                 </a>
               </div>
 
-              <div className="mt-10 flex flex-wrap gap-6 text-sm text-slate-300">
+              <div className="fade-up mt-10 flex flex-wrap gap-6 text-sm text-slate-300">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-emerald-300" />
                   Browser-only processing
@@ -119,7 +146,7 @@ export const LandingPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-2xl shadow-emerald-500/10 backdrop-blur-sm">
+            <div className="floating-card rounded-3xl border border-white/10 bg-white/5 p-5 shadow-[0_30px_80px_rgba(16,185,129,0.12)] backdrop-blur-sm">
               <div className="rounded-2xl border border-emerald-400/20 bg-slate-900/80 p-6">
                 <div className="mb-6 flex items-center justify-between">
                   <div>
@@ -157,7 +184,7 @@ export const LandingPage: React.FC = () => {
         <section className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
           <div className="grid gap-4 md:grid-cols-4">
             {proofPoints.map((point) => (
-              <div key={point.label} className="rounded-2xl border border-white/10 bg-white/5 p-5 text-center">
+              <div key={point.label} className="fade-up rounded-2xl border border-white/10 bg-white/5 p-5 text-center">
                 <div className="text-3xl font-black text-white">{point.value}</div>
                 <div className="mt-2 text-sm text-slate-300">{point.label}</div>
               </div>
@@ -166,14 +193,14 @@ export const LandingPage: React.FC = () => {
         </section>
 
         <section id="features" className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
-          <div className="mb-12 max-w-2xl">
+          <div className="fade-up mb-12 max-w-2xl">
             <div className="text-sm font-medium uppercase tracking-[0.24em] text-emerald-300">Why teams choose it</div>
             <h2 className="mt-4 text-3xl font-bold tracking-tight text-white sm:text-4xl">Built for privacy-first AI work.</h2>
           </div>
 
           <div className="grid gap-6 lg:grid-cols-3">
             {featureCards.map(({ icon: Icon, title, description }) => (
-              <div key={title} className="rounded-3xl border border-white/10 bg-slate-900 p-6">
+              <div key={title} className="fade-up rounded-3xl border border-white/10 bg-slate-900/80 p-6 shadow-[0_18px_50px_rgba(2,6,23,0.55)]">
                 <div className="mb-5 inline-flex rounded-2xl bg-emerald-500/10 p-3 text-emerald-300 ring-1 ring-emerald-400/30">
                   <Icon className="h-6 w-6" />
                 </div>
@@ -186,7 +213,7 @@ export const LandingPage: React.FC = () => {
 
         <section className="border-y border-white/10 bg-slate-900/70">
           <div className="mx-auto grid max-w-7xl gap-10 px-6 py-20 lg:grid-cols-[0.9fr_1.1fr] lg:px-8">
-            <div>
+            <div className="fade-up">
               <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-500/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-cyan-200">
                 <BarChart3 className="h-3.5 w-3.5" />
                 Built for clarity
@@ -196,7 +223,7 @@ export const LandingPage: React.FC = () => {
 
             <div className="space-y-4">
               {pillars.map((pillar) => (
-                <div key={pillar} className="flex gap-3 rounded-2xl border border-white/10 bg-slate-950/70 p-4">
+                <div key={pillar} className="fade-up flex gap-3 rounded-2xl border border-white/10 bg-slate-950/70 p-4">
                   <div className="mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300">
                     <CheckCircle2 className="h-4 w-4" />
                   </div>
@@ -209,13 +236,13 @@ export const LandingPage: React.FC = () => {
       </main>
 
       <footer className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between lg:px-8">
-        <div className="flex items-center gap-3">
+        <div className="fade-up flex items-center gap-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-400/30">
             <Sparkles className="h-4 w-4" />
           </div>
           <span>AIscrubber</span>
         </div>
-        <div className="flex items-center gap-6">
+        <div className="fade-up flex items-center gap-6">
           <span>Privacy-first AI workflow</span>
           <span className="inline-flex items-center gap-2"><Users className="h-4 w-4" /> Founder-led product</span>
         </div>

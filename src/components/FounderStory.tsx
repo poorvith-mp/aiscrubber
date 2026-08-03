@@ -19,7 +19,7 @@ export const FounderStory: React.FC = () => {
             AIscrubber was created to make privacy-conscious AI usage realistic for real teams. The goal is simple: keep data usable while preventing sensitive details from leaking into the wrong systems.
           </p>
           <p className="mt-4 text-base leading-8 text-slate-300">
-            By working directly with modern product teams and operators, the product focuses on trust, clarity, and fast time-to-value with no authentication friction or hidden backend complexity.
+            By working directly with modern product teams and operators, the product focuses on trust, clarity, and fast time-to-value without auth friction or hidden backend complexity.
           </p>
         </div>
       </div>

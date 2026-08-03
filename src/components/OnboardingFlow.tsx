@@ -1,4 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
+import { useGSAP } from '@gsap/react';
+import gsap from 'gsap';
 import { ArrowRight, CheckCircle2, ChevronLeft, ShieldCheck, Sparkles } from 'lucide-react';
 
 const onboardingSteps = [
@@ -26,10 +28,30 @@ const onboardingSteps = [
 
 export const OnboardingFlow: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(0);
+  const rootRef = useRef<HTMLElement>(null);
 
   const current = onboardingSteps[currentStep];
   const progress = useMemo(() => ((currentStep + 1) / onboardingSteps.length) * 100, [currentStep]);
   const isLastStep = currentStep === onboardingSteps.length - 1;
+
+  useGSAP(() => {
+    const ctx = gsap.context(() => {
+      gsap.from('.onboarding-panel', {
+        opacity: 0,
+        y: 30,
+        duration: 0.7,
+        ease: 'power3.out',
+      });
+
+      gsap.to('.progress-bar', {
+        width: `${progress}%`,
+        duration: 0.5,
+        ease: 'power2.out',
+      });
+    }, rootRef);
+
+    return () => ctx.revert();
+  }, [progress]);
 
   const nextStep = () => {
     if (isLastStep) {
@@ -47,8 +69,8 @@ export const OnboardingFlow: React.FC = () => {
   const completed = currentStep >= onboardingSteps.length;
 
   return (
-    <section id="onboarding" className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
-      <div className="rounded-[32px] border border-emerald-400/20 bg-slate-900 p-6 shadow-2xl shadow-emerald-500/10 sm:p-8 lg:p-10">
+    <section id="onboarding" ref={rootRef} className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+      <div className="onboarding-panel rounded-[32px] border border-emerald-400/20 bg-slate-900 p-6 shadow-[0_30px_80px_rgba(16,185,129,0.08)] sm:p-8 lg:p-10">
         <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="text-sm font-medium uppercase tracking-[0.24em] text-emerald-300">Onboarding</div>
@@ -62,10 +84,7 @@ export const OnboardingFlow: React.FC = () => {
         {!completed ? (
           <>
             <div className="mb-8 h-2 overflow-hidden rounded-full bg-slate-800">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 transition-all duration-300"
-                style={{ width: `${progress}%` }}
-              />
+              <div className="progress-bar h-full rounded-full bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400" style={{ width: '0%' }} />
             </div>
 
             <div className="grid gap-8 lg:grid-cols-[1fr_0.9fr]">
