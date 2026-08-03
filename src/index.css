@@ -2,20 +2,32 @@
 
 @layer base {
   :root {
-    --bg-canvas: #FBF8FA;
-    --bg-surface: #FFFFFF;
-    --bg-muted: #F6F3F5;
-    --text-primary: #172033;
-    --text-muted: #667085;
-    --border-subtle: #E7ECF2;
-    --border: #E7ECF2;
-    --accent: #0F766E;
-    --accent-soft: #F0FDF4;
+    color-scheme: dark;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+  }
+
+  html {
+    scroll-behavior: smooth;
   }
 
   body {
-    background-color: var(--bg-canvas);
-    color: var(--text-primary);
-    font-family: 'Geist', system-ui, sans-serif;
+    margin: 0;
+    min-height: 100vh;
+    background: #020817;
+    color: #f8fafc;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  a {
+    text-decoration: none;
+  }
+
+  img {
+    display: block;
+    max-width: 100%;
   }
 }
