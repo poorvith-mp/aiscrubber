@@ -1,6 +1,5 @@
 <div align="center">
 
-<img src="assets/img/aiscrubber-logo" alt="AiScrubber logo" width="80"/>
 
 # AiScrubber
 
@@ -32,7 +31,7 @@ AiScrubber is a **browser-based privacy gateway** that detects and masks Persona
 
 No server. No account. No tracking. Your data never leaves your browser.
 
-Built solo by **[Poorvith M P](https://github.com/prvthmpcypher)**.
+Built by **[Poorvith M P](https://github.com/prvthmpcypher)** with help of frontier AI Models.
 
 ---
 
@@ -67,16 +66,6 @@ Everything happens **in your browser RAM.** Nothing is sent anywhere.
 - 🌑 **Dark-first UI** — Clean, distraction-free workspace built for professionals
 - 💸 **Free forever** — No account, no paywall, no ads
 
----
-
-## 🖥️ Screenshots
-
-> **Homepage — Hero**
-![Homepage](assets/img/homepage-preview.png)
-
-> **Scrub Workspace**
-*Paste → Scrub → Export*
-![Workspace](assets/img/workspace-preview.png)
 
 ---
 
@@ -149,15 +138,6 @@ No `npm install`. No build step. No dependencies. Just open and use.
 
 ---
 
-## 💰 Pricing
-
-| Plan | Price | Features |
-|------|-------|---------|
-| **Community Protocol** | $0/mo | Client-side processing, regex sanitization, vault export, open-source |
-| **Enterprise Vault** *(planned)* | TBD | Advanced entity recognition, API, team policy templates, priority SLA |
-
----
-
 ## 🧭 More from Poorvith M P
 
 | Project | What it does |
@@ -165,7 +145,6 @@ No `npm install`. No build step. No dependencies. Just open and use.
 | [SafeGen](https://github.com/prvthmpcypher/safegen) | Password generator that never leaves your browser |
 | [PaperHive](https://github.com/prvthmpcypher/paperhive) | Offline-first PDF toolkit |
 | [PortfolioGen](https://github.com/prvthmpcypher/portfoliogen) | Browser-only portfolio generator |
-| [CypherPDF](https://github.com/prvthmpcypher/cypherpdf) | Clutter-free PDF reader for Android |
 
 ---
 
@@ -214,7 +193,7 @@ Released under the [MIT License](LICENSE) — free to use, modify, and distribut
 
 **Poorvith M P** — Indie developer, privacy-first tools
 
-[![X](https://img.shields.io/badge/X-@poorvithmp07-black?style=flat-square&logo=x)](https://x.com/poorvithmp07)
+[![X](https://img.shields.io/badge/X-@poorvith_mp-black?style=flat-square&logo=x)](https://x.com/poorvith_mp)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-poorvithmp-blue?style=flat-square&logo=linkedin)](https://www.linkedin.com/in/poorvithmp)
 [![GitHub](https://img.shields.io/badge/GitHub-prvthmpcypher-181717?style=flat-square&logo=github)](https://github.com/prvthmpcypher)
 
@@ -224,6 +203,6 @@ Released under the [MIT License](LICENSE) — free to use, modify, and distribut
 
 © 2026 Poorvith M P · Independent, open-source project
 
-*Built from scratch. Learned as I went. Shipped anyway.*
+*Built from scratch. Learned as I went through learning web development with help of ai and video courses. Shipped anyway.*
 
 </div>
