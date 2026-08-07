@@ -1,4 +1,5 @@
 import React from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { FounderStory } from './components/FounderStory';
 import { LandingPage } from './components/LandingPage';
 import { OnboardingFlow } from './components/OnboardingFlow';
@@ -11,6 +12,7 @@ export function App() {
       <ScrubberWorkspace />
       <OnboardingFlow />
       <FounderStory />
+      <Analytics />
     </div>
   );
 }

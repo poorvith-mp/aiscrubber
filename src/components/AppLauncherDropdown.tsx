@@ -161,7 +161,7 @@ export const AppLauncherDropdown: React.FC = () => {
 
           <div className="flex items-center justify-between px-1 mb-2">
             <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400">
-              Cypher Tool Suite
+              PoorvithMP Tools
             </span>
           </div>
 
