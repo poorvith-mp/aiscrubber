@@ -11,6 +11,7 @@ import {
   Sparkles,
   Users,
 } from 'lucide-react';
+import { AppLauncherDropdown } from './AppLauncherDropdown';
 
 const proofPoints = [
   { value: '4x', label: 'faster privacy review' },
@@ -89,13 +90,16 @@ export const LandingPage: React.FC = () => {
             <a href="#founder" className="transition hover:text-white">Founder</a>
           </nav>
 
-          <a
-            href="#onboarding"
-            className="fade-up inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/25"
-          >
-            Get started
-            <ArrowRight className="h-4 w-4" />
-          </a>
+          <div className="flex items-center gap-3">
+            <a
+              href="#onboarding"
+              className="fade-up inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-sm font-medium text-emerald-200 transition hover:bg-emerald-500/25"
+            >
+              Get started
+              <ArrowRight className="h-4 w-4" />
+            </a>
+            <AppLauncherDropdown />
+          </div>
         </div>
       </header>
 
