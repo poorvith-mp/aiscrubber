@@ -44,6 +44,13 @@ export const setSharedAuthCookie = (userData: any, sessionData: any = null) => {
   };
 
   document.cookie = `${COOKIE_NAME}=${encodeURIComponent(JSON.stringify(payload))}; path=/${domainStr}; max-age=${maxAge}; SameSite=Lax${secureStr}`;
+  try {
+    if (userData) {
+      localStorage.setItem('poorvith_auth_user', JSON.stringify(payload.user));
+    } else {
+      localStorage.removeItem('poorvith_auth_user');
+    }
+  } catch {}
 };
 
 export const clearSharedAuthCookie = () => {
@@ -51,67 +58,82 @@ export const clearSharedAuthCookie = () => {
   const domain = getCookieDomain();
   const domainStr = domain ? `; domain=${domain}` : '';
   document.cookie = `${COOKIE_NAME}=; path=/${domainStr}; max-age=0; SameSite=Lax`;
+  try {
+    localStorage.removeItem('poorvith_auth_user');
+  } catch {}
 };
 
-export const syncEcosystemAuth = async (onUserChange: (user: any) => void) => {
+export const syncEcosystemAuth = (onUserChange: (user: any) => void) => {
   if (typeof window === 'undefined') return;
 
-  // 1. Check URL hash for OAuth / Handoff fragment
-  if (window.location.hash.includes('access_token=')) {
-    const params = new URLSearchParams(window.location.hash.substring(1));
-    const accessToken = params.get('access_token');
-    const refreshToken = params.get('refresh_token');
-    if (accessToken && supabase) {
-      try {
-        const { data: { session } } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken || ''
-        });
-        if (session?.user) {
-          setSharedAuthCookie(session.user, session);
-          onUserChange(session.user);
-          window.history.replaceState(null, '', window.location.pathname);
-          return;
-        }
-      } catch (e) {
-        console.error('Error setting session from URL hash:', e);
-      }
+  // 1. INSTANT SYNCHRONOUS HYDRATION (0ms UI latency)
+  const urlParams = new URLSearchParams(window.location.search);
+  const ssoUserRaw = urlParams.get('sso_user');
+  let instantUser = null;
+
+  if (ssoUserRaw) {
+    try {
+      instantUser = JSON.parse(decodeURIComponent(ssoUserRaw));
+    } catch {}
+  }
+
+  if (!instantUser) {
+    const shared = getSharedAuthCookie();
+    if (shared?.user) {
+      instantUser = shared.user;
     }
   }
 
-  // 2. Check URL query params for SSO handoff token/user
-  const urlParams = new URLSearchParams(window.location.search);
-  const ssoUserRaw = urlParams.get('sso_user');
-  if (ssoUserRaw) {
+  if (!instantUser) {
     try {
-      const ssoUser = JSON.parse(decodeURIComponent(ssoUserRaw));
-      setSharedAuthCookie(ssoUser);
-      onUserChange(ssoUser);
+      const saved = localStorage.getItem('poorvith_auth_user');
+      if (saved) instantUser = JSON.parse(saved);
+    } catch {}
+  }
+
+  if (instantUser) {
+    onUserChange(instantUser);
+    setSharedAuthCookie(instantUser);
+  }
+
+  // 2. BACKGROUND NON-BLOCKING VERIFICATION
+  setTimeout(async () => {
+    if (window.location.hash.includes('access_token=')) {
+      const params = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = params.get('access_token');
+      const refreshToken = params.get('refresh_token');
+      if (accessToken && supabase) {
+        try {
+          const { data: { session } } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken || ''
+          });
+          if (session?.user) {
+            setSharedAuthCookie(session.user, session);
+            onUserChange(session.user);
+            window.history.replaceState(null, '', window.location.pathname);
+            return;
+          }
+        } catch {}
+      }
+    }
+
+    if (ssoUserRaw) {
       urlParams.delete('sso_user');
       const newQuery = urlParams.toString() ? `?${urlParams.toString()}` : '';
       window.history.replaceState(null, '', `${window.location.pathname}${newQuery}`);
-      return;
-    } catch {}
-  }
+    }
 
-  // 3. Check Supabase session
-  if (supabase) {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setSharedAuthCookie(session.user, session);
-        onUserChange(session.user);
-        return;
-      }
-    } catch {}
-  }
-
-  // 4. Fall back to shared cookie
-  const shared = getSharedAuthCookie();
-  if (shared?.user) {
-    onUserChange(shared.user);
-    return;
-  }
-
-  onUserChange(null);
+    if (supabase) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          setSharedAuthCookie(session.user, session);
+          onUserChange(session.user);
+        } else if (!instantUser) {
+          onUserChange(null);
+        }
+      } catch {}
+    }
+  }, 0);
 };
