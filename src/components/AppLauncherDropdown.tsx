@@ -8,10 +8,18 @@ import {
   GraduationCap,
   Key,
   Layout,
-  Home,
   ChevronDown
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
+
+export const PoorvithMPLogoIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
+  <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="64" height="64" rx="18" fill="#020617"/>
+    <rect x="2" y="2" width="60" height="60" rx="16" stroke="#334155" strokeWidth="3" strokeOpacity="0.8"/>
+    <text x="32" y="44" fontFamily="'Inter', system-ui, sans-serif" fontSize="34" fontWeight="900" fill="#F8FAFC" textAnchor="middle">P</text>
+    <circle cx="48" cy="48" r="4" fill="#10B981"/>
+  </svg>
+);
 
 export const TOOLS_LIST = [
   {
@@ -58,7 +66,7 @@ export const TOOLS_LIST = [
     id: 'poorvithmp',
     name: 'PoorvithMP',
     desc: 'Main Portfolio & Hub',
-    icon: Home,
+    icon: PoorvithMPLogoIcon,
     color: 'from-slate-700 to-slate-900',
     url: 'https://poorvithmp.com'
   }
@@ -173,8 +181,16 @@ export const AppLauncherDropdown: React.FC = () => {
           <div className="grid grid-cols-3 gap-2">
             {TOOLS_LIST.map((tool) => {
               const Icon = tool.icon;
-              const targetUrl = session?.access_token && tool.id !== 'aiscrubber'
-                ? `${tool.url}/#access_token=${session.access_token}&refresh_token=${session.refresh_token}&token_type=bearer`
+              const userPayload = user ? encodeURIComponent(JSON.stringify({
+                id: user.id,
+                email: user.email,
+                user_metadata: user.user_metadata || { full_name: user.email?.split('@')[0] }
+              })) : '';
+
+              const targetUrl = userPayload && tool.id !== 'aiscrubber'
+                ? (session?.access_token
+                    ? `${tool.url}/?sso_user=${userPayload}#access_token=${session.access_token}&refresh_token=${session.refresh_token}&token_type=bearer`
+                    : `${tool.url}/?sso_user=${userPayload}`)
                 : tool.url;
 
               return (
@@ -184,7 +200,7 @@ export const AppLauncherDropdown: React.FC = () => {
                   onClick={() => setIsOpen(false)}
                   className="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-900 bg-slate-900/60 hover:bg-slate-800 hover:border-slate-700 transition group text-center"
                 >
-                  <div className={`p-2.5 rounded-xl bg-gradient-to-br ${tool.color} text-white shadow-sm group-hover:scale-110 transition-transform mb-1.5`}>
+                  <div className={`p-2.5 rounded-xl bg-gradient-to-br ${tool.color} text-white shadow-sm group-hover:scale-110 transition-transform mb-1.5 flex items-center justify-center`}>
                     <Icon size={18} />
                   </div>
                   <span className="text-xs font-bold text-slate-200 group-hover:text-emerald-400 line-clamp-1">
