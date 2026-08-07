@@ -67,15 +67,18 @@ export const TOOLS_LIST = [
 export const AppLauncherDropdown: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [session, setSession] = useState<any>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user || null);
+    supabase.auth.getSession().then(({ data: { session: activeSession } }) => {
+      setSession(activeSession);
+      setUser(activeSession?.user || null);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, activeSession) => {
+      setSession(activeSession);
+      setUser(activeSession?.user || null);
     });
 
     function handleClickOutside(event: MouseEvent) {
@@ -98,14 +101,16 @@ export const AppLauncherDropdown: React.FC = () => {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
+    setSession(null);
     setIsOpen(false);
+    window.location.reload();
   };
 
   return (
     <div className="relative inline-block text-left" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 rounded-xl border border-white/10 bg-slate-900/80 px-3.5 py-2 text-xs font-bold text-slate-200 transition hover:border-emerald-500/50 hover:text-white min-h-[44px]"
+        className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2 text-xs font-bold text-slate-200 transition hover:border-emerald-500/50 hover:text-white min-h-[44px]"
         aria-label="App launcher and account menu"
       >
         <Grid size={16} className="text-emerald-400 shrink-0" />
@@ -119,7 +124,7 @@ export const AppLauncherDropdown: React.FC = () => {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 rounded-2xl border border-white/15 bg-slate-950 p-4 text-slate-100 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 rounded-2xl border border-slate-800 bg-slate-950 p-4 text-slate-100 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
           <div className="border-b border-slate-800 pb-3 mb-3">
             {user ? (
               <div className="flex items-center justify-between gap-3">
@@ -168,10 +173,14 @@ export const AppLauncherDropdown: React.FC = () => {
           <div className="grid grid-cols-3 gap-2">
             {TOOLS_LIST.map((tool) => {
               const Icon = tool.icon;
+              const targetUrl = session?.access_token && tool.id !== 'aiscrubber'
+                ? `${tool.url}/#access_token=${session.access_token}&refresh_token=${session.refresh_token}&token_type=bearer`
+                : tool.url;
+
               return (
                 <a
                   key={tool.id}
-                  href={tool.url}
+                  href={targetUrl}
                   onClick={() => setIsOpen(false)}
                   className="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-900 bg-slate-900/60 hover:bg-slate-800 hover:border-slate-700 transition group text-center"
                 >
