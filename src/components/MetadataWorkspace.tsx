@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   Camera,
   Check,
+  CheckCircle2,
   Clipboard,
   Download,
   Edit3,
@@ -27,14 +28,14 @@ import { useState } from 'react';
 import {
   applyMetadataEdits,
   parseFileMetadata,
-  stripFileMetadata,
+  stripMetadataUniversal,
+  type FileMetadataAnalysis,
   type MetadataField,
-  type ParsedMetadata,
 } from '../lib/metadata';
 
 export function MetadataWorkspace() {
   const [file, setFile] = useState<File | null>(null);
-  const [metadata, setMetadata] = useState<ParsedMetadata | null>(null);
+  const [metadata, setMetadata] = useState<FileMetadataAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'view' | 'edit' | 'strip'>('view');
   const [strippedBlob, setStrippedBlob] = useState<Blob | null>(null);
@@ -42,6 +43,7 @@ export function MetadataWorkspace() {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
+  const [signWithC2pa, setSignWithC2pa] = useState(true);
 
   // Editable metadata state
   const [editFields, setEditFields] = useState<Record<string, string>>({
@@ -61,15 +63,15 @@ export function MetadataWorkspace() {
       const parsed = await parseFileMetadata(selectedFile);
       setMetadata(parsed);
 
-      const authorField = parsed.fields.find((f) => f.category === 'author');
-      const titleField = parsed.fields.find((f) => f.tag.includes('Title'));
-      const softwareField = parsed.fields.find((f) => f.tag.includes('Software'));
+      const authorField = parsed.fields.find((f) => f.category === 'author' || f.tag.includes('Artist') || f.tag.includes('Author'));
+      const titleField = parsed.fields.find((f) => f.tag.includes('Title') || f.tag.includes('ImageDescription') || f.tag.includes('Prompt'));
+      const softwareField = parsed.fields.find((f) => f.tag.includes('Software') || f.tag.includes('Creator'));
       const copyField = parsed.fields.find((f) => f.tag.includes('Copyright'));
 
       setEditFields({
-        Author: authorField?.value || '',
-        Title: titleField?.value || '',
-        Software: softwareField?.value || '',
+        Author: authorField?.value || parsed.c2pa?.signer || '',
+        Title: titleField?.value || parsed.c2pa?.aiPrompt || '',
+        Software: softwareField?.value || parsed.c2pa?.generator || 'AIScrubber Suite v2.2.0',
         Copyright: copyField?.value || '',
       });
     } catch (err) {
@@ -90,7 +92,7 @@ export function MetadataWorkspace() {
     setIsStripping(true);
     setStatusMessage(null);
     try {
-      const cleanBlob = await stripFileMetadata(file);
+      const cleanBlob = await stripMetadataUniversal(file);
       setStrippedBlob(cleanBlob);
       setStatusMessage('100% of metadata and C2PA manifests stripped successfully!');
 
@@ -115,8 +117,15 @@ export function MetadataWorkspace() {
     setIsSavingEdit(true);
     setStatusMessage(null);
     try {
-      const modifiedBlob = await applyMetadataEdits(file, editFields);
-      setStatusMessage('Metadata edits applied & saved into binary stream!');
+      const modifiedBlob = await applyMetadataEdits(file, {
+        Author: editFields.Author,
+        Title: editFields.Title,
+        Software: editFields.Software,
+        Copyright: editFields.Copyright,
+        signWithC2pa,
+      });
+
+      setStatusMessage('Custom Metadata & C2PA Manifest successfully encoded! Re-upload this downloaded file anytime to inspect the verified [CR] card and metadata attributes.');
 
       const url = URL.createObjectURL(modifiedBlob);
       const a = document.createElement('a');
@@ -146,16 +155,16 @@ export function MetadataWorkspace() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-[var(--line)]">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="badge-emerald">Metadata Desk</span>
+            <span className="badge-emerald">Metadata & C2PA Desk</span>
             <span className="text-xs text-[var(--muted)] font-mono">
-              C2PA · EXIF · GPS · PDF · Media
+              C2PA [CR] · EXIF · GPS · PNG · PDF · Media
             </span>
           </div>
           <h2 className="text-2xl md:text-3xl font-headline font-bold">
             Metadata & C2PA Provenance Desk
           </h2>
           <p className="text-sm text-[var(--muted)] mt-1">
-            Inspect C2PA Content Credentials (ChatGPT, DALL·E 3, Nano Banana), edit author tags in-place, or strip 100% of metadata client-side.
+            Inspect C2PA Content Credentials (ChatGPT, DALL·E 3, Nano Banana), edit custom author tags in-place, or strip 100% of metadata client-side.
           </p>
         </div>
 
@@ -183,124 +192,116 @@ export function MetadataWorkspace() {
               }`}
             >
               <Edit3 size={14} />
-              Editor
+              Edit / Inject Metadata
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('strip')}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-bold transition-all ${
                 activeTab === 'strip'
-                  ? 'bg-[var(--accent)] text-[var(--accent-ink)]'
-                  : 'text-[var(--muted)] hover:text-[var(--text)]'
+                  ? 'bg-red-500 text-white'
+                  : 'text-red-400 hover:text-red-300'
               }`}
             >
-              <Zap size={14} />
+              <Trash2 size={14} />
               1-Click Stripper
             </button>
           </div>
         )}
       </div>
 
-      {/* File Dropzone */}
+      {/* Notification Strip */}
+      {statusMessage && (
+        <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <CheckCircle2 size={15} />
+            {statusMessage}
+          </span>
+          <button
+            type="button"
+            onClick={() => setStatusMessage(null)}
+            className="text-[var(--muted)] hover:text-[var(--text)] font-mono"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* Upload Drop Zone */}
       {!file ? (
         <div
           onDragOver={(e) => e.preventDefault()}
           onDrop={onDrop}
-          className="p-12 rounded-2xl border-2 border-dashed border-[var(--line)] bg-[var(--surface-sunken)] text-center hover:border-[var(--accent)] transition-all cursor-pointer group"
+          className="border-2 border-dashed border-[var(--line)] hover:border-[var(--accent)] rounded-3xl p-12 text-center transition-all bg-[var(--surface-sunken)] space-y-4 group cursor-pointer"
         >
-          <label className="cursor-pointer flex flex-col items-center">
-            <div className="w-16 h-16 rounded-full bg-[var(--accent-tint)] flex items-center justify-center text-[var(--accent)] mb-4 group-hover:scale-110 transition-transform">
-              <UploadCloud size={32} />
-            </div>
-            <h3 className="text-lg font-bold mb-1">
-              Drag and drop an Image, PDF, or Audio file
+          <div className="w-16 h-16 rounded-2xl bg-[var(--panel)] border border-[var(--line)] text-[var(--accent)] flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
+            <UploadCloud size={32} />
+          </div>
+          <div>
+            <h3 className="font-headline font-bold text-lg">
+              Drag & Drop file to inspect C2PA & Metadata
             </h3>
-            <p className="text-xs text-[var(--muted)] max-w-md mb-4">
-              Inspect C2PA Content Credentials, EXIF/GPS tags, PNG chunks, PDF author records, or MP3 tags. 100% processed in local browser RAM.
+            <p className="text-xs text-[var(--muted)] mt-1">
+              Supports JPEG, PNG (tEXt/caPI chunks), WebP, PDF documents, and MP3 audio. 100% In-Browser Memory.
             </p>
-            <span className="btn-primary text-xs font-bold px-5 py-2.5">
-              Browse Local File
-            </span>
+          </div>
+          <label className="btn-primary text-xs font-bold px-6 py-2.5 inline-flex items-center gap-2 cursor-pointer">
+            Browse File
             <input
               type="file"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) handleFileSelect(f);
-              }}
+              onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+              accept="image/*,application/pdf,audio/*"
               className="hidden"
             />
           </label>
         </div>
+      ) : loading ? (
+        <div className="p-12 text-center space-y-3 font-mono text-xs text-[var(--muted)]">
+          <RefreshCw size={24} className="animate-spin text-[var(--accent)] mx-auto" />
+          <span>Extracting EXIF, IPTC, XMP, and C2PA manifests in local RAM...</span>
+        </div>
       ) : (
-        /* Loaded File Workbench */
+        /* Metadata Content Area */
         <div className="space-y-6">
-          {/* File Overview Strip */}
-          <div className="p-4 rounded-xl bg-[var(--surface-sunken)] border border-[var(--line)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          {/* File Overview Summary Strip */}
+          <div className="p-4 rounded-2xl bg-[var(--surface-sunken)] border border-[var(--line)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-[var(--accent-tint)] flex items-center justify-center text-[var(--accent)] font-bold font-mono text-xs">
-                {file.name.split('.').pop()?.toUpperCase() || 'FILE'}
+              <div className="w-10 h-10 rounded-xl bg-[var(--panel)] border border-[var(--line)] flex items-center justify-center text-[var(--accent)]">
+                <FileCheck size={20} />
               </div>
               <div>
-                <h4 className="font-bold text-sm truncate max-w-sm" title={file.name}>
-                  {file.name}
-                </h4>
-                <div className="flex items-center gap-2 text-xs text-[var(--muted)]">
-                  <span>{(file.size / 1024).toFixed(1)} KB</span>
-                  <span>·</span>
-                  <span>{file.type || 'Unknown MIME'}</span>
-                </div>
+                <span className="font-bold text-sm text-[var(--text)] block truncate max-w-sm">
+                  {metadata?.fileName}
+                </span>
+                <span className="text-xs text-[var(--muted)] font-mono">
+                  {(metadata?.fileSize || 0) > 1024 * 1024
+                    ? `${((metadata?.fileSize || 0) / (1024 * 1024)).toFixed(2)} MB`
+                    : `${Math.round((metadata?.fileSize || 0) / 1024)} KB`}{' '}
+                  · {metadata?.mimeType}
+                </span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <button
-                type="button"
-                onClick={() => setFile(null)}
-                className="btn-secondary text-xs"
-              >
+            <div className="flex items-center gap-2">
+              <label className="btn-secondary text-xs flex items-center gap-1.5 cursor-pointer">
+                <RefreshCw size={13} />
                 Change File
-              </button>
-              <button
-                type="button"
-                onClick={handleQuickStrip}
-                disabled={isStripping}
-                className="btn-primary text-xs font-bold flex items-center gap-1.5"
-              >
-                <Zap size={14} />
-                {isStripping ? 'Sanitizing...' : 'Strip & Download'}
-              </button>
+                <input
+                  type="file"
+                  onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                  accept="image/*,application/pdf,audio/*"
+                  className="hidden"
+                />
+              </label>
             </div>
           </div>
 
-          {/* Status Alert */}
-          {statusMessage && (
-            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center gap-2 font-bold animate-fade-in">
-              <Check size={16} />
-              <span>{statusMessage}</span>
-            </div>
-          )}
-
-          {/* Threats & Hazards */}
-          {metadata && metadata.threats.length > 0 && (
-            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300">
-              <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider mb-2">
-                <AlertTriangle size={16} />
-                Detected Privacy & Provenance Findings ({metadata.threats.length})
-              </div>
-              <ul className="text-xs space-y-1 list-disc pl-5 text-amber-200/90">
-                {metadata.threats.map((threat, i) => (
-                  <li key={i}>{threat}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* TAB 1: METADATA VIEWER & C2PA */}
+          {/* TAB 1: VIEWER & C2PA */}
           {activeTab === 'view' && metadata && (
             <div className="space-y-6">
-              {/* C2PA CONTENT CREDENTIALS CARD (Like ChatGPT / Nano Banana) */}
-              {metadata.c2pa && (
-                <div className="p-5 rounded-2xl bg-[var(--surface-sunken)] border-2 border-emerald-500/30 shadow-lg space-y-4">
+              {/* C2PA CONTENT CREDENTIALS CARD (Like ChatGPT / Nano Banana / Adobe) */}
+              {metadata.c2pa?.hasManifest ? (
+                <div className="p-5 rounded-2xl bg-[var(--surface-sunken)] border-2 border-emerald-500/40 shadow-lg space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--line)]">
                     <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center font-mono font-bold text-emerald-400 text-sm">
@@ -344,7 +345,7 @@ export function MetadataWorkspace() {
                     </div>
                     <div className="p-3 rounded-xl bg-[var(--panel)] border border-[var(--line)] space-y-1">
                       <span className="text-[var(--muted)] text-[11px] block uppercase">Claim Action</span>
-                      <span className="font-bold text-[var(--text)] block truncate">{metadata.c2pa.actionSummary}</span>
+                      <span className="font-bold text-[var(--text)] block truncate">{metadata.c2pa.claimAction}</span>
                     </div>
                     <div className="p-3 rounded-xl bg-[var(--panel)] border border-[var(--line)] space-y-1">
                       <span className="text-[var(--muted)] text-[11px] block uppercase">Signature Timestamp</span>
@@ -353,16 +354,16 @@ export function MetadataWorkspace() {
                   </div>
 
                   {/* Embedded Generation Prompt if present */}
-                  {metadata.c2pa.promptUsed && (
+                  {metadata.c2pa.aiPrompt && (
                     <div className="p-3.5 rounded-xl bg-[var(--panel)] border border-[var(--line)] space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold flex items-center gap-1.5 text-[var(--accent)]">
                           <Sparkles size={14} />
-                          Embedded AI Generation Prompt
+                          Embedded AI Generation Prompt / Title
                         </span>
                         <button
                           type="button"
-                          onClick={() => copyPromptToClipboard(metadata.c2pa?.promptUsed || '')}
+                          onClick={() => copyPromptToClipboard(metadata.c2pa?.aiPrompt || '')}
                           className="text-xs text-[var(--muted)] hover:text-[var(--text)] flex items-center gap-1 font-mono"
                         >
                           {copiedPrompt ? <Check size={12} className="text-emerald-400" /> : <Clipboard size={12} />}
@@ -370,7 +371,7 @@ export function MetadataWorkspace() {
                         </button>
                       </div>
                       <p className="text-xs font-mono text-[var(--text)] bg-[var(--surface-sunken)] p-2.5 rounded-lg border border-[var(--line)] whitespace-pre-wrap">
-                        {metadata.c2pa.promptUsed}
+                        {metadata.c2pa.aiPrompt}
                       </p>
                     </div>
                   )}
@@ -386,10 +387,10 @@ export function MetadataWorkspace() {
                     </div>
                   )}
                 </div>
-              )}
+              ) : null}
 
               {/* GPS Map Block if present */}
-              {metadata.hasGps && metadata.gpsCoordinates && (
+              {metadata.gpsCoordinates && (
                 <div className="p-4 rounded-xl bg-[var(--surface-sunken)] border border-red-500/30">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2 text-red-400 font-bold text-xs uppercase tracking-wider">
@@ -397,7 +398,7 @@ export function MetadataWorkspace() {
                       Embedded GPS Location Found
                     </div>
                     <a
-                      href={metadata.gpsCoordinates.mapsUrl}
+                      href={metadata.gpsCoordinates.googleMapsUrl}
                       target="_blank"
                       rel="noreferrer"
                       className="text-xs text-[var(--accent)] hover:underline flex items-center gap-1 font-bold"
@@ -453,23 +454,33 @@ export function MetadataWorkspace() {
                     ))}
                   </div>
                 ) : (
-                  <div className="p-8 text-center text-xs text-[var(--muted)]">
-                    No embedded metadata tags detected in this file. It is clean or already sanitized.
+                  <div className="p-8 text-center space-y-3">
+                    <p className="text-xs text-[var(--muted)]">
+                      No embedded metadata tags detected in this file. It is clean or already sanitized.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('edit')}
+                      className="btn-secondary text-xs inline-flex items-center gap-1.5"
+                    >
+                      <Edit3 size={13} />
+                      Inject Custom Metadata & C2PA
+                    </button>
                   </div>
                 )}
               </div>
             </div>
           )}
 
-          {/* TAB 2: METADATA EDITOR */}
+          {/* TAB 2: METADATA EDITOR & C2PA INJECTOR */}
           {activeTab === 'edit' && (
             <div className="p-6 rounded-2xl bg-[var(--surface-sunken)] border border-[var(--line)] space-y-6">
               <div>
                 <h3 className="font-headline font-bold text-lg mb-1">
-                  In-Place Metadata Injection & Tag Editing
+                  In-Place Metadata Injection & C2PA Signer
                 </h3>
                 <p className="text-xs text-[var(--muted)]">
-                  Overwrites or injects custom fields into JPEG EXIF, PNG chunks, PDF trailers, or ID3 containers while stripping GPS coordinates and tracking hashes.
+                  Overwrites or injects custom fields into JPEG EXIF/APP11, PNG tEXt/caPI chunks, PDF trailers, or ID3 containers while stripping GPS coordinates.
                 </p>
               </div>
 
@@ -491,7 +502,7 @@ export function MetadataWorkspace() {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-[var(--muted)]">
-                    Document / Image Title
+                    Document / Image Title / Prompt
                   </label>
                   <input
                     type="text"
@@ -506,7 +517,7 @@ export function MetadataWorkspace() {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-[var(--muted)]">
-                    Software Fingerprint
+                    Software / Generator Fingerprint
                   </label>
                   <input
                     type="text"
@@ -535,15 +546,34 @@ export function MetadataWorkspace() {
                 </div>
               </div>
 
+              {/* Sign with C2PA Toggle */}
+              <div className="p-3.5 rounded-xl bg-[var(--panel)] border border-[var(--line)] flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <span className="text-xs font-bold flex items-center gap-1.5 text-emerald-400">
+                    <ShieldCheck size={14} />
+                    Sign with C2PA Content Credentials [CR] Manifest
+                  </span>
+                  <p className="text-[11px] text-[var(--muted)]">
+                    Embeds verifiable cryptographic provenance box (APP11 JUMBF in JPEG, caPI chunk in PNG) so detectors immediately verify your authorship.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={signWithC2pa}
+                  onChange={(e) => setSignWithC2pa(e.target.checked)}
+                  className="accent-[var(--accent)] w-4 h-4 cursor-pointer"
+                />
+              </div>
+
               <div className="pt-4 border-t border-[var(--line)] flex items-center justify-between flex-wrap gap-4">
-                <span className="text-xs text-[var(--muted)]">
-                  Binary tag injection executes 100% in browser memory.
+                <span className="text-xs text-[var(--muted)] font-mono">
+                  100% Client-Side Binary Stream Encoding
                 </span>
                 <button
                   type="button"
                   onClick={handleSaveEdits}
                   disabled={isSavingEdit}
-                  className="btn-primary text-xs font-bold flex items-center gap-1.5"
+                  className="btn-primary text-xs font-bold flex items-center gap-1.5 shadow-md hover:scale-105 transition-all"
                 >
                   <Save size={14} />
                   {isSavingEdit ? 'Encoding & Saving...' : 'Apply & Download Edited File'}

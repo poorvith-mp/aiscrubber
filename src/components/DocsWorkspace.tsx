@@ -195,12 +195,13 @@ When user CUST-44912 (email: billing@partner.org) charges over $500, trigger web
         id: 'cli-reference',
         category: 'developer-tools',
         categoryLabel: 'Developer Tools',
-        title: 'AIScrubber Developer CLI',
+        title: 'AIScrubber Developer CLI & Help System',
         description:
-          'Run zero-install privacy scrubbing, AI watermark cleaning, and EXIF stripping directly in your terminal using npx.',
+          'Comprehensive terminal guide: Zero-install commands, interactive flags, sub-command help, and automation recipes using npx.',
         headings: [
           { id: 'cli-quickstart', title: 'CLI Quickstart' },
-          { id: 'cli-commands', title: 'Supported Commands' },
+          { id: 'cli-help-system', title: 'Command-Specific Help System' },
+          { id: 'cli-commands', title: 'Supported Commands Reference' },
         ],
         content: (
           <div className="space-y-6 text-sm text-[var(--muted)] leading-relaxed">
@@ -222,29 +223,83 @@ When user CUST-44912 (email: billing@partner.org) charges over $500, trigger web
               <pre className="text-[var(--accent)]">$ npx aiscrubber clean-watermarks ./claude.md -o ./clean.md</pre>
             </div>
 
+            <h4 id="cli-help-system" className="text-base font-bold text-[var(--text)] pt-2">
+              Interactive Command Help System
+            </h4>
+            <p className="text-xs">
+              Every command comes with built-in usage guides and examples right inside your terminal:
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono">
+              <div className="p-2.5 rounded-lg bg-[var(--surface-sunken)] border border-[var(--line)]">
+                <code className="text-[var(--accent)] block font-bold">$ npx aiscrubber help scrub</code>
+                <span className="text-[var(--muted)] text-[11px]">Usage, flags, and regex details</span>
+              </div>
+              <div className="p-2.5 rounded-lg bg-[var(--surface-sunken)] border border-[var(--line)]">
+                <code className="text-[var(--accent)] block font-bold">$ npx aiscrubber help clean-watermarks</code>
+                <span className="text-[var(--muted)] text-[11px]">Unicode stripping parameters</span>
+              </div>
+              <div className="p-2.5 rounded-lg bg-[var(--surface-sunken)] border border-[var(--line)]">
+                <code className="text-[var(--accent)] block font-bold">$ npx aiscrubber help mask</code>
+                <span className="text-[var(--muted)] text-[11px]">Session key generation flags</span>
+              </div>
+              <div className="p-2.5 rounded-lg bg-[var(--surface-sunken)] border border-[var(--line)]">
+                <code className="text-[var(--accent)] block font-bold">$ npx aiscrubber help inspect</code>
+                <span className="text-[var(--muted)] text-[11px]">Metadata and threat scanner</span>
+              </div>
+            </div>
+
             <h4 id="cli-commands" className="text-base font-bold text-[var(--text)] pt-2">
-              Available CLI Commands
+              Complete Commands Reference
             </h4>
             <div className="space-y-3 text-xs">
-              <div className="p-3 rounded-lg bg-[var(--panel)] border border-[var(--line)] space-y-1">
-                <code className="text-[var(--accent)] font-bold block">npx aiscrubber clean-watermarks &lt;file | text&gt; [-o out.txt]</code>
-                <span>Strips Claude & AI invisible zero-width watermarks, synthetic spaces, and homoglyphs.</span>
+              <div className="p-3.5 rounded-xl bg-[var(--panel)] border border-[var(--line)] space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <code className="text-[var(--accent)] font-bold text-xs">clean-watermarks &lt;file | text&gt;</code>
+                  <span className="font-mono text-[10px] text-[var(--muted)]">Options: -o, --json</span>
+                </div>
+                <p className="text-[var(--muted)]">
+                  Strips Claude zero-width watermarks (`\u200B`, `\uFEFF`, `\u2060`), converts synthetic whitespace to ASCII spaces, and normalizes confusable homoglyphs.
+                </p>
               </div>
-              <div className="p-3 rounded-lg bg-[var(--panel)] border border-[var(--line)] space-y-1">
-                <code className="text-[var(--accent)] font-bold block">npx aiscrubber scrub &lt;file | text&gt; [-o out.txt]</code>
-                <span>Replaces emails, API keys, bearer tokens, IP addresses, and IDs with numbered tokens.</span>
+
+              <div className="p-3.5 rounded-xl bg-[var(--panel)] border border-[var(--line)] space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <code className="text-[var(--accent)] font-bold text-xs">scrub &lt;file | text&gt;</code>
+                  <span className="font-mono text-[10px] text-[var(--muted)]">Options: -o, --json</span>
+                </div>
+                <p className="text-[var(--muted)]">
+                  Replaces emails, API keys, Bearer tokens, IP addresses, payment cards, and IDs with deterministic numbered tokens.
+                </p>
               </div>
-              <div className="p-3 rounded-lg bg-[var(--panel)] border border-[var(--line)] space-y-1">
-                <code className="text-[var(--accent)] font-bold block">npx aiscrubber mask &lt;prompt&gt; --key session.aiscrub.json</code>
-                <span>Masks confidential database URLs and API keys with constants and saves an unmasking session key.</span>
+
+              <div className="p-3.5 rounded-xl bg-[var(--panel)] border border-[var(--line)] space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <code className="text-[var(--accent)] font-bold text-xs">mask &lt;prompt&gt; --key session.aiscrub.json</code>
+                  <span className="font-mono text-[10px] text-[var(--muted)]">Options: -k, -o</span>
+                </div>
+                <p className="text-[var(--muted)]">
+                  Masks confidential database URLs, passwords, and API keys into constants and exports an encrypted session key.
+                </p>
               </div>
-              <div className="p-3 rounded-lg bg-[var(--panel)] border border-[var(--line)] space-y-1">
-                <code className="text-[var(--accent)] font-bold block">npx aiscrubber unmask &lt;ai-file&gt; --key session.aiscrub.json</code>
-                <span>Reconstructs original variables back into the returned AI generated output.</span>
+
+              <div className="p-3.5 rounded-xl bg-[var(--panel)] border border-[var(--line)] space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <code className="text-[var(--accent)] font-bold text-xs">unmask &lt;ai-response&gt; --key session.aiscrub.json</code>
+                  <span className="font-mono text-[10px] text-[var(--muted)]">Options: -k, -o</span>
+                </div>
+                <p className="text-[var(--muted)]">
+                  Reconstructs original confidential credentials back into AI-generated code.
+                </p>
               </div>
-              <div className="p-3 rounded-lg bg-[var(--panel)] border border-[var(--line)] space-y-1">
-                <code className="text-[var(--accent)] font-bold block">npx aiscrubber strip-metadata &lt;files...&gt;</code>
-                <span>Wipes EXIF GPS tags from images and zeros `/Info` dictionaries in PDF documents.</span>
+
+              <div className="p-3.5 rounded-xl bg-[var(--panel)] border border-[var(--line)] space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <code className="text-[var(--accent)] font-bold text-xs">inspect &lt;file | text&gt;</code>
+                  <span className="font-mono text-[10px] text-[var(--muted)]">Options: --json</span>
+                </div>
+                <p className="text-[var(--muted)]">
+                  Terminal security inspector that audits files for exposed API keys, C2PA Content Credentials manifests, and hidden EXIF GPS tags.
+                </p>
               </div>
             </div>
           </div>
@@ -705,13 +760,13 @@ When user CUST-44912 (email: billing@partner.org) charges over $500, trigger web
 
           <div className="pt-6 border-t border-[var(--line)] space-y-2">
             <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--muted)] block">
-              Developer Packages
+              CLI Help Quick Command
             </span>
             <div className="p-2.5 rounded-lg bg-[var(--panel)] border border-[var(--line)] font-mono text-[11px] space-y-1">
-              <span className="text-[var(--muted)] block">CLI:</span>
-              <span className="text-[var(--accent)] font-bold">npx aiscrubber</span>
-              <span className="text-[var(--muted)] block pt-1">MCP:</span>
-              <span className="text-[var(--accent)] font-bold">npx aiscrubber-mcp</span>
+              <span className="text-[var(--muted)] block">Help Command:</span>
+              <span className="text-[var(--accent)] font-bold">npx aiscrubber help</span>
+              <span className="text-[var(--muted)] block pt-1">Specific Sub-Command:</span>
+              <span className="text-[var(--accent)] font-bold">npx aiscrubber help scrub</span>
             </div>
           </div>
         </aside>

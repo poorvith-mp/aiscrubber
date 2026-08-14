@@ -36,7 +36,7 @@ Everything runs **100% in local memory**—zero telemetry, zero server roundtrip
 - **Step 3 (Query AI):** Paste the masked prompt to ChatGPT or Claude.
 - **Step 4 (1-Click Reconstruct):** Paste the AI's generated response and session key to unmask all original variables back into working code.
 
-### 3. ✨ AI Text & Claude Watermark Remover (NEW)
+### 3. ✨ AI Text & Claude Watermark Remover
 - Strips invisible Unicode zero-width watermarks (`\u200B`, `\u200C`, `\u200D`, `\uFEFF`, `\u2060`) embedded in Anthropic Claude & LLM outputs.
 - Normalizes non-standard synthetic spaces (En, Em, Thin, Hair, Narrow No-Break, Fullwidth spaces).
 - Reverts confusable Cyrillic/mathematical homoglyphs to Latin standards.
@@ -44,7 +44,7 @@ Everything runs **100% in local memory**—zero telemetry, zero server roundtrip
 
 ### 4. 🖼️ Metadata & C2PA Provenance Desk
 - In-browser parsing of JPEG (EXIF/GPS/IPTC/XMP), PNG chunks (`tEXt`/`caPI`), PDF `/Info` dictionaries, and Audio ID3 tags.
-- **C2PA Content Credentials [CR] Inspector**: Detects cryptographic provenance manifests from ChatGPT (DALL·E 3), Nano Banana, Adobe Firefly, and Google Imagen, and extracts embedded AI generation prompts.
+- **C2PA Content Credentials [CR] Inspector & Signer**: Detects cryptographic provenance manifests from ChatGPT (DALL·E 3), Nano Banana, Adobe Firefly, and Google Imagen, and allows custom binary tag signing.
 - **1-Click Stripper:** Re-encodes clean pixel buffers and wipes C2PA tracking fingerprints.
 
 ### 5. 🎨 Visual Media Redactor
@@ -54,7 +54,7 @@ Everything runs **100% in local memory**—zero telemetry, zero server roundtrip
 
 ---
 
-## 💻 CLI Quickstart
+## 💻 CLI Quickstart & Help System
 
 Run the standalone CLI with zero installation via `npx`:
 
@@ -71,8 +71,24 @@ npx aiscrubber mask "Connect postgres://admin:P@ssw0rd@db.internal:5432" --key s
 # Unmask AI response with your session key
 npx aiscrubber unmask ./ai-response.py --key session.aiscrub.json --output ./final-code.py
 
+# Inspect file or text for hidden EXIF, C2PA, or leaked API keys
+npx aiscrubber inspect ./production-dump.log
+
 # Strip metadata & C2PA manifests from documents and images
 npx aiscrubber strip-metadata ./photos/*.jpg ./reports/*.pdf
+```
+
+### Command-Specific Help in Terminal
+
+Get instant interactive usage instructions for any command:
+
+```bash
+npx aiscrubber help clean-watermarks
+npx aiscrubber help scrub
+npx aiscrubber help mask
+npx aiscrubber help unmask
+npx aiscrubber help strip-metadata
+npx aiscrubber help inspect
 ```
 
 ---
