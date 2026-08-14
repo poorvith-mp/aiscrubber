@@ -45,6 +45,14 @@ const DETECTORS = {
   },
 };
 
+// Homoglyphs Map
+const HOMOGLYPH_MAP = {
+  'а': 'a', 'А': 'A', 'с': 'c', 'С': 'C', 'е': 'e', 'Е': 'E', 'о': 'o', 'О': 'O',
+  'р': 'p', 'Р': 'P', 'ѕ': 's', 'Ѕ': 'S', 'х': 'x', 'Х': 'X', 'у': 'y', 'У': 'Y',
+  'і': 'i', 'І': 'I', 'ј': 'j', 'Ј': 'J',
+  '–': '-', '—': '-', '‘': "'", '’': "'", '“': '"', '”': '"',
+};
+
 function printHelp() {
   console.log(`
 \x1b[1m\x1b[32mAI\x1b[0m\x1b[1mscrubber CLI\x1b[0m \x1b[90mv${VERSION}\x1b[0m
@@ -54,11 +62,12 @@ Zero-telemetry privacy suite for developer prompts, crash logs, and files.
   $ npx aiscrubber <command> [options]
 
 \x1b[1mCOMMANDS\x1b[0m
-  \x1b[36mscrub\x1b[0m <file | text>           Scrub PII, tokens, and secrets into numbered labels
-  \x1b[36mmask\x1b[0m <file | prompt>          Mask secrets with constants and generate a session key
-  \x1b[36munmask\x1b[0m <ai-file> --key <key>   Reconstruct original secrets back into returned AI output
-  \x1b[36mstrip-metadata\x1b[0m <files...>       Strip EXIF, GPS, and PDF/Audio metadata client-side
-  \x1b[36minspect\x1b[0m <file>                 Inspect hidden metadata and security threats
+  \x1b[36mclean-watermarks\x1b[0m <file | text>  Strip Claude & AI invisible Unicode zero-width watermarks
+  \x1b[36mscrub\x1b[0m <file | text>             Scrub PII, tokens, and secrets into numbered labels
+  \x1b[36mmask\x1b[0m <file | prompt>            Mask secrets with constants and generate a session key
+  \x1b[36munmask\x1b[0m <ai-file> --key <key>     Reconstruct original secrets back into returned AI output
+  \x1b[36mstrip-metadata\x1b[0m <files...>         Strip EXIF, GPS, C2PA, and PDF/Audio metadata client-side
+  \x1b[36minspect\x1b[0m <file>                   Inspect hidden metadata and security threats
 
 \x1b[1mOPTIONS\x1b[0m
   -o, --output <path>            Write output to a specific file instead of stdout
@@ -68,11 +77,55 @@ Zero-telemetry privacy suite for developer prompts, crash logs, and files.
   -v, --version                  Show CLI version
 
 \x1b[1mEXAMPLES\x1b[0m
+  $ npx aiscrubber clean-watermarks ./claude-output.md -o ./clean-article.md
   $ npx aiscrubber scrub ./logs/production-crash.log -o ./logs/clean.log
   $ npx aiscrubber mask "Connect postgres://user:pass@db.internal:5432" --key ./session.aiscrub.json
   $ npx aiscrubber unmask ./ai-response.py --key ./session.aiscrub.json -o ./final-code.py
   $ npx aiscrubber strip-metadata ./photos/*.jpg ./reports/*.pdf
 `);
+}
+
+// Clean Watermarks
+function cleanWatermarks(content) {
+  let cleaned = content;
+  let zeroWidthCount = 0;
+  let spacesCount = 0;
+  let homoglyphCount = 0;
+
+  // Zero-width & invisible Unicode (both raw and escaped literals)
+  const zwRegex = /[\u200B\u200C\u200D\uFEFF\u2060\u180E\u00AD\u034F\u061C\u17B4\u17B5\u200E\u200F\u202A-\u202E\u2066-\u2069]|\\u(?:200[b-fB-F]|feff|FEFF|206[0-9]|180[eE]|00[aA][dD]|034[fF]|202[a-eA-E])/g;
+  const zwMatches = cleaned.match(zwRegex);
+  if (zwMatches) {
+    zeroWidthCount = zwMatches.length;
+    cleaned = cleaned.replace(zwRegex, '');
+  }
+
+  // Non-standard spaces
+  const spaceRegex = /[\u00A0\u2000-\u200A\u202F\u205F\u3000]|\\u(?:00[aA]0|200[0-9aA]|202[fF]|205[fF]|3000)/g;
+  const spMatches = cleaned.match(spaceRegex);
+  if (spMatches) {
+    spacesCount = spMatches.length;
+    cleaned = cleaned.replace(spaceRegex, ' ');
+  }
+
+  // Homoglyphs
+  cleaned = cleaned.replace(/[а-яА-ЯёЁіІјЈѕЅ–—‘’“”]/g, (m) => {
+    if (HOMOGLYPH_MAP[m]) {
+      homoglyphCount++;
+      return HOMOGLYPH_MAP[m];
+    }
+    return m;
+  });
+
+  return {
+    cleaned,
+    stats: {
+      zeroWidthCount,
+      spacesCount,
+      homoglyphCount,
+      totalCleaned: zeroWidthCount + spacesCount + homoglyphCount,
+    },
+  };
 }
 
 // Scrub Text
@@ -176,6 +229,34 @@ async function run() {
   }
 
   const command = args[0];
+
+  // CLEAN-WATERMARKS
+  if (command === 'clean-watermarks' || command === 'watermark') {
+    const target = args[1];
+    if (!target) {
+      console.error('\x1b[31mError:\x1b[0m Provide a text string or file path to clean watermarks.');
+      process.exit(1);
+    }
+
+    let inputContent = target;
+    if (fs.existsSync(target)) {
+      inputContent = fs.readFileSync(target, 'utf-8');
+    }
+
+    const { cleaned, stats } = cleanWatermarks(inputContent);
+
+    const outIndex = args.findIndex((a) => a === '-o' || a === '--output');
+    if (outIndex !== -1 && args[outIndex + 1]) {
+      const outPath = args[outIndex + 1];
+      fs.writeFileSync(outPath, cleaned, 'utf-8');
+      console.log(`\x1b[32m✔ AI Watermarks stripped!\x1b[0m Removed ${stats.totalCleaned} hidden anomalies (${stats.zeroWidthCount} zero-width, ${stats.spacesCount} spaces, ${stats.homoglyphCount} homoglyphs). Saved to \x1b[1m${outPath}\x1b[0m`);
+    } else if (args.includes('-j') || args.includes('--json')) {
+      console.log(JSON.stringify({ cleaned, stats }, null, 2));
+    } else {
+      console.log(cleaned);
+    }
+    return;
+  }
 
   // SCRUB
   if (command === 'scrub') {
@@ -285,7 +366,6 @@ async function run() {
       const buffer = fs.readFileSync(filePath);
       const ext = path.extname(filePath).toLowerCase();
 
-      // Clean PDF metadata
       if (ext === '.pdf') {
         let text = buffer.toString('latin1');
         text = text.replace(/\/Info\s+\d+\s+\d+\s+R/g, '/Info null');

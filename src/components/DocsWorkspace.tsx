@@ -56,15 +56,6 @@ export function DocsWorkspace() {
 Database connection: postgresql://admin_user:P@ssw0rd9988@db.prod.internal.acme.com:5432/billing_prod
 When user CUST-44912 (email: billing@partner.org) charges over $500, trigger webhook https://hooks.acme.com/alerts/fraud with token ghp_998811223344556677889900aabbccddeeff.`;
 
-  const mockExifDump = `Make: Sony
-Camera Model: ILCE-7M4
-Software: Adobe Lightroom 13.2 (Macintosh)
-DateTimeOriginal: 2026:08:14 14:12:09
-Artist: Poorvith M P
-GPSLatitude: 12.9716 N
-GPSLongitude: 77.5946 E
-GPSAltitude: 920m (Bengaluru, India)`;
-
   const mcpConfigJson = `{
   "mcpServers": {
     "aiscrubber": {
@@ -105,7 +96,7 @@ GPSAltitude: 920m (Bengaluru, India)`;
             </div>
 
             <h4 id="core-architecture" className="text-base font-bold text-[var(--text)] pt-2">
-              Four Privacy Engines + Developer Tooling
+              Five Dedicated Privacy Engines
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="p-3.5 rounded-xl bg-[var(--surface-sunken)] border border-[var(--line)] space-y-1.5">
@@ -128,23 +119,75 @@ GPSAltitude: 920m (Bengaluru, India)`;
               </div>
               <div className="p-3.5 rounded-xl bg-[var(--surface-sunken)] border border-[var(--line)] space-y-1.5">
                 <span className="font-bold text-xs text-[var(--accent)] flex items-center gap-1.5">
-                  <FileSpreadsheet size={14} />
-                  3. Metadata Desk
+                  <Sparkles size={14} />
+                  3. AI Watermark Remover
                 </span>
                 <p className="text-xs">
-                  Client-side EXIF/GPS viewer, in-place tag editor, and 1-click binary stripper for JPEG, PNG, PDF, and MP3 files.
+                  Strips Claude zero-width invisible watermarks, normalizes non-standard spaces, and reverts homoglyphs.
                 </p>
               </div>
               <div className="p-3.5 rounded-xl bg-[var(--surface-sunken)] border border-[var(--line)] space-y-1.5">
                 <span className="font-bold text-xs text-[var(--accent)] flex items-center gap-1.5">
-                  <ImageIcon size={14} />
-                  4. Visual Media Redactor
+                  <FileSpreadsheet size={14} />
+                  4. Metadata & C2PA Desk
                 </span>
                 <p className="text-xs">
-                  Canvas-based blurring, pixelation, and blackouts for screenshots and images before sharing.
+                  Inspects C2PA Content Credentials (ChatGPT, DALL·E 3, Nano Banana), edits author tags, and strips EXIF/GPS.
                 </p>
               </div>
             </div>
+          </div>
+        ),
+      },
+      {
+        id: 'watermark-remover',
+        category: 'features',
+        categoryLabel: 'Core Features',
+        title: 'AI Text & Claude Watermark Remover',
+        description:
+          'Detect and strip invisible zero-width tokens, synthetic spacing patterns, homoglyphs, and AI provenance markers from Claude & LLM outputs.',
+        headings: [
+          { id: 'watermark-overview', title: 'Why AI Watermarks Exist' },
+          { id: 'unicode-detectors', title: 'Invisible Unicode Categories' },
+          { id: 'cleaning-profiles', title: 'Cleaning Profiles' },
+        ],
+        content: (
+          <div className="space-y-6 text-sm text-[var(--muted)] leading-relaxed">
+            <p id="watermark-overview">
+              Leading AI providers embed machine-readable invisible watermarks into generated text. These markers use zero-width Unicode characters, specific whitespace sequences, or statistical token biases to identify AI-generated content.
+            </p>
+
+            <h4 id="unicode-detectors" className="text-base font-bold text-[var(--text)] pt-2">
+              Detected Invisible Entities
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="p-3 rounded-lg bg-[var(--surface-sunken)] border border-[var(--line)]">
+                <strong className="block text-[var(--text)] mb-1 font-mono">Zero-Width Tokens</strong>
+                <span>U+200B (ZWSP), U+200C (ZWNJ), U+200D (ZWJ), U+FEFF (BOM), U+2060 (WJ)</span>
+              </div>
+              <div className="p-3 rounded-lg bg-[var(--surface-sunken)] border border-[var(--line)]">
+                <strong className="block text-[var(--text)] mb-1 font-mono">Synthetic Spaces</strong>
+                <span>U+00A0 (NBSP), U+2000-U+200A (En/Em/Thin/Hair), U+202F, U+3000</span>
+              </div>
+              <div className="p-3 rounded-lg bg-[var(--surface-sunken)] border border-[var(--line)]">
+                <strong className="block text-[var(--text)] mb-1 font-mono">Homoglyphs & Confusables</strong>
+                <span>Cyrillic & mathematical lookalikes mapped back to standard Latin characters</span>
+              </div>
+              <div className="p-3 rounded-lg bg-[var(--surface-sunken)] border border-[var(--line)]">
+                <strong className="block text-[var(--text)] mb-1 font-mono">Bidi & Control Marks</strong>
+                <span>U+200E (LRM), U+200F (RLM), U+202A-U+202E, U+2066-U+2069</span>
+              </div>
+            </div>
+
+            <h4 id="cleaning-profiles" className="text-base font-bold text-[var(--text)] pt-2">
+              Available Cleaning Profiles
+            </h4>
+            <ul className="list-disc pl-5 space-y-1.5 text-xs">
+              <li><strong>Aggressive (All Tiers):</strong> Complete sanitization of zero-width, non-standard spaces, homoglyphs, and AI footers.</li>
+              <li><strong>Claude & LLM Output:</strong> Tuned specifically for Anthropic Claude and ChatGPT response structures.</li>
+              <li><strong>Code Safe:</strong> Preserves necessary syntax indentation for Python, YAML, JS, and Rust while stripping invisible characters.</li>
+              <li><strong>Invisible Unicode Only:</strong> Minimalist mode removing strictly zero-width and bidi characters.</li>
+            </ul>
           </div>
         ),
       },
@@ -154,40 +197,39 @@ GPSAltitude: 920m (Bengaluru, India)`;
         categoryLabel: 'Developer Tools',
         title: 'AIScrubber Developer CLI',
         description:
-          'Run zero-install privacy scrubbing, prompt masking, and EXIF stripping directly in your terminal using npx.',
+          'Run zero-install privacy scrubbing, AI watermark cleaning, and EXIF stripping directly in your terminal using npx.',
         headings: [
           { id: 'cli-quickstart', title: 'CLI Quickstart' },
           { id: 'cli-commands', title: 'Supported Commands' },
-          { id: 'cli-automation', title: 'Automated CI & Scripting' },
         ],
         content: (
           <div className="space-y-6 text-sm text-[var(--muted)] leading-relaxed">
             <h4 id="cli-quickstart" className="text-base font-bold text-[var(--text)]">
               Quickstart with Zero Installation
             </h4>
-            <p>
-              You can run the AIScrubber CLI immediately with any Node.js environment:
-            </p>
-
             <div className="rounded-xl bg-[var(--surface-sunken)] border border-[var(--line)] p-4 font-mono text-xs overflow-x-auto space-y-2">
               <div className="flex items-center justify-between pb-2 border-b border-[var(--line)] text-[var(--muted)]">
                 <span>Terminal Command</span>
                 <button
                   type="button"
-                  onClick={() => copyToClipboard('npx aiscrubber scrub ./logs/crash.log -o ./logs/clean.log', 'clip1')}
+                  onClick={() => copyToClipboard('npx aiscrubber clean-watermarks ./claude.md -o ./clean.md', 'clip1')}
                   className="text-xs text-[var(--accent)] hover:underline flex items-center gap-1 font-sans font-bold"
                 >
                   {copiedSnippet === 'clip1' ? <Check size={13} /> : <Clipboard size={13} />}
                   {copiedSnippet === 'clip1' ? 'Copied' : 'Copy'}
                 </button>
               </div>
-              <pre className="text-[var(--accent)]">$ npx aiscrubber scrub ./logs/crash.log -o ./logs/clean.log</pre>
+              <pre className="text-[var(--accent)]">$ npx aiscrubber clean-watermarks ./claude.md -o ./clean.md</pre>
             </div>
 
             <h4 id="cli-commands" className="text-base font-bold text-[var(--text)] pt-2">
               Available CLI Commands
             </h4>
             <div className="space-y-3 text-xs">
+              <div className="p-3 rounded-lg bg-[var(--panel)] border border-[var(--line)] space-y-1">
+                <code className="text-[var(--accent)] font-bold block">npx aiscrubber clean-watermarks &lt;file | text&gt; [-o out.txt]</code>
+                <span>Strips Claude & AI invisible zero-width watermarks, synthetic spaces, and homoglyphs.</span>
+              </div>
               <div className="p-3 rounded-lg bg-[var(--panel)] border border-[var(--line)] space-y-1">
                 <code className="text-[var(--accent)] font-bold block">npx aiscrubber scrub &lt;file | text&gt; [-o out.txt]</code>
                 <span>Replaces emails, API keys, bearer tokens, IP addresses, and IDs with numbered tokens.</span>
@@ -218,17 +260,12 @@ GPSAltitude: 920m (Bengaluru, India)`;
         headings: [
           { id: 'claude-desktop-config', title: 'Claude Desktop Setup' },
           { id: 'mcp-tools', title: 'Exposed MCP Tools' },
-          { id: 'cursor-integration', title: 'Cursor & IDE Integration' },
         ],
         content: (
           <div className="space-y-6 text-sm text-[var(--muted)] leading-relaxed">
             <h4 id="claude-desktop-config" className="text-base font-bold text-[var(--text)]">
               Claude Desktop Configuration
             </h4>
-            <p>
-              Add the AIScrubber MCP server to your <code className="font-mono text-[var(--text)] bg-[var(--surface-sunken)] px-1.5 py-0.5 rounded">claude_desktop_config.json</code>:
-            </p>
-
             <div className="rounded-xl bg-[var(--surface-sunken)] border border-[var(--line)] p-4 font-mono text-xs overflow-x-auto">
               <div className="flex items-center justify-between pb-2 mb-2 border-b border-[var(--line)] text-[var(--muted)]">
                 <span>claude_desktop_config.json</span>
@@ -248,6 +285,9 @@ GPSAltitude: 920m (Bengaluru, India)`;
               Exposed MCP Tools for AI Agents
             </h4>
             <ul className="list-disc pl-5 space-y-2 text-xs">
+              <li>
+                <strong className="text-[var(--text)]">clean_ai_watermarks:</strong> Strips invisible Unicode zero-width watermarks (Anthropic Claude & ChatGPT markers).
+              </li>
               <li>
                 <strong className="text-[var(--text)]">scrub_text:</strong> Sanitizes raw logs and text into safe tokens before sending across API boundaries.
               </li>
@@ -270,8 +310,6 @@ GPSAltitude: 920m (Bengaluru, India)`;
           'Scan and replace sensitive emails, phone numbers, IP addresses, secrets, and custom identifiers with consistent numbered labels.',
         headings: [
           { id: 'built-in-detectors', title: 'Built-in Detectors' },
-          { id: 'custom-rules', title: 'Custom Regex & Keyword Rules' },
-          { id: 'diff-inspection', title: 'Diff & Inspection Mode' },
         ],
         content: (
           <div className="space-y-6 text-sm text-[var(--muted)] leading-relaxed">
@@ -327,7 +365,6 @@ GPSAltitude: 920m (Bengaluru, India)`;
           'Zero-Exposure Prompting: Mask secrets with constants before querying AI, download a session key, and reconstruct the AI response in 1 click.',
         headings: [
           { id: 'the-roundtrip-flow', title: 'The 4-Step Roundtrip' },
-          { id: 'enhancement-profiles', title: 'Enhancement Profiles' },
         ],
         content: (
           <div className="space-y-6 text-sm text-[var(--muted)] leading-relaxed">
@@ -359,22 +396,29 @@ GPSAltitude: 920m (Bengaluru, India)`;
         id: 'metadata-desk',
         category: 'features',
         categoryLabel: 'Core Features',
-        title: 'Metadata Desk: Viewer, Editor & Stripper',
+        title: 'Metadata & C2PA Provenance Desk',
         description:
-          'Deep client-side inspection and 1-click sanitization of EXIF, GPS coordinates, PDF author streams, and audio ID3 tags.',
+          'Deep client-side inspection of C2PA Content Credentials (ChatGPT, DALL·E 3, Nano Banana), EXIF/GPS, PDF author streams, and audio ID3 tags.',
         headings: [
+          { id: 'c2pa-provenance', title: 'C2PA Content Credentials' },
           { id: 'supported-formats', title: 'Supported Formats' },
-          { id: 'gps-threat-model', title: 'GPS Location Risks' },
         ],
         content: (
           <div className="space-y-6 text-sm text-[var(--muted)] leading-relaxed">
-            <h4 id="supported-formats" className="text-base font-bold text-[var(--text)]">
+            <h4 id="c2pa-provenance" className="text-base font-bold text-[var(--text)]">
+              C2PA Content Credentials & AI Provenance
+            </h4>
+            <p>
+              AIScrubber parses cryptographic C2PA JUMBF manifests (APP11 segment in JPEG, `caPI` chunks in PNG) embedded by ChatGPT (DALL·E 3), Nano Banana, and Adobe Firefly, extracting the signing authority and original generation prompts.
+            </p>
+
+            <h4 id="supported-formats" className="text-base font-bold text-[var(--text)] pt-2">
               Supported File Types
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
               <div className="p-3 rounded-lg bg-[var(--surface-sunken)] border border-[var(--line)]">
-                <strong className="block text-[var(--text)] font-semibold mb-1">Images</strong>
-                <span>JPEG (EXIF/GPS/IPTC), PNG (chunks), WebP, SVG</span>
+                <strong className="block text-[var(--text)] font-semibold mb-1">Images & C2PA</strong>
+                <span>JPEG (EXIF/GPS/XMP/APP11), PNG (tEXt/caPI), WebP, SVG</span>
               </div>
               <div className="p-3 rounded-lg bg-[var(--surface-sunken)] border border-[var(--line)]">
                 <strong className="block text-[var(--text)] font-semibold mb-1">Documents</strong>
@@ -398,7 +442,6 @@ GPSAltitude: 920m (Bengaluru, India)`;
         headings: [
           { id: 'recipe-nginx', title: 'Recipe 1: Public Issue Log Scrubbing' },
           { id: 'recipe-ai-db', title: 'Recipe 2: AI Database Migration Prompt' },
-          { id: 'recipe-photo-exif', title: 'Recipe 3: Photo GPS & Camera Stripping' },
         ],
         content: (
           <div className="space-y-8 text-sm text-[var(--muted)] leading-relaxed">
@@ -469,7 +512,6 @@ GPSAltitude: 920m (Bengaluru, India)`;
           'Guidelines for high-security environments, pre-publishing verification checklists, and handling false positives.',
         headings: [
           { id: 'pre-publish-checklist', title: 'Pre-Publishing Checklist' },
-          { id: 'pattern-limits', title: 'Understanding Pattern Limits' },
         ],
         content: (
           <div className="space-y-6 text-sm text-[var(--muted)] leading-relaxed">
@@ -483,11 +525,11 @@ GPSAltitude: 920m (Bengaluru, India)`;
               </label>
               <label className="flex items-start gap-2.5 p-2.5 rounded-lg bg-[var(--surface-sunken)] border border-[var(--line)]">
                 <input type="checkbox" defaultChecked className="mt-0.5" />
-                <span>Check for proprietary project code-names and add them as custom keyword rules if missed.</span>
+                <span>Strip invisible Unicode zero-width watermarks from Claude/AI outputs before pasting into documents.</span>
               </label>
               <label className="flex items-start gap-2.5 p-2.5 rounded-lg bg-[var(--surface-sunken)] border border-[var(--line)]">
                 <input type="checkbox" defaultChecked className="mt-0.5" />
-                <span>Save your <code className="text-[var(--accent)]">.aiscrub.json</code> session key in a secure local folder if you plan to unmask an AI response.</span>
+                <span>Check for proprietary project code-names and add them as custom keyword rules if missed.</span>
               </label>
             </div>
           </div>
@@ -551,7 +593,7 @@ GPSAltitude: 920m (Bengaluru, India)`;
               [
                 { cat: 'getting-started', label: 'Getting Started' },
                 { cat: 'developer-tools', label: 'Developer Tools & MCP' },
-                { cat: 'features', label: 'Core Engines' },
+                { cat: 'features', label: 'Five Core Engines' },
                 { cat: 'use-cases', label: 'Use Cases & Recipes' },
                 { cat: 'best-practices', label: 'Best Practices' },
               ] as const

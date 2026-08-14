@@ -1,26 +1,16 @@
 import {
   ArrowRight,
-  ArrowUpRight,
   Bot,
   Check,
   CheckCircle2,
   ChevronRight,
-  Code2,
   Copy,
-  ExternalLink,
-  Eye,
   FileCode2,
   FileSpreadsheet,
-  FileText,
   ImageIcon,
-  Key,
-  Layers,
   Lock,
-  Play,
   RefreshCw,
-  Scale,
   Shield,
-  ShieldAlert,
   ShieldCheck,
   Sparkles,
   Zap,
@@ -28,64 +18,71 @@ import {
 import { useEffect, useState } from 'react';
 import type { ToolView } from '../App';
 
+interface HomeWorkspaceProps {
+  onSelectTool: (tool: ToolView) => void;
+}
+
 const ROTATING_PHRASES = [
+  'Stripping Anthropic Claude & AI Invisible Watermarks',
   'Masking API Keys & Secrets for LLMs',
-  'Stripping EXIF GPS Location Telemetry',
-  'Scrubbing PII in Production Incident Logs',
-  'Blurring Confidential UI Screenshots',
-  'Sanitizing PDF Author & Creation Traces',
-  'Restoring Masked AI Responses in 1-Click',
+  'Stripping C2PA Manifests & EXIF GPS Coordinates',
+  'Scrubbing PII & Bearer Tokens in Incident Logs',
+  'Sanitizing PDF Author & Editing Trails',
 ];
 
-export function HomeWorkspace({
-  onSelectTool,
-}: {
-  onSelectTool: (view: ToolView) => void;
-}) {
+export function HomeWorkspace({ onSelectTool }: HomeWorkspaceProps) {
   const [phraseIndex, setPhraseIndex] = useState(0);
-  const [isScrubbedDemo, setIsScrubbedDemo] = useState(false);
+  const [isScrubbedDemo, setIsScrubbedDemo] = useState(true);
   const [copiedDemo, setCopiedDemo] = useState(false);
 
-  // Rotate hero thinking phrases
+  // Cycle security statements every 3.5s
   useEffect(() => {
-    const interval = setInterval(() => {
+    const timer = setInterval(() => {
       setPhraseIndex((prev) => (prev + 1) % ROTATING_PHRASES.length);
-    }, 2800);
-    return () => clearInterval(interval);
+    }, 3500);
+    return () => clearInterval(timer);
   }, []);
 
-  const demoRawText = `User CUST-99214 reported timeout on api.acme.cloud.
-Auth header: Bearer sk-live-99881122334455667788
-Contact user at alex.rivas@acme.corp or call +1 (555) 019-2834.
-Client IPv4: 192.168.1.144 | GPS Lat: 12.9716, Lon: 77.5946`;
+  const demoRawText = `// Production Incident Crash Dump
+Host: 192.168.1.144 | Environment: AWS_PROD
+Database URL: postgresql://admin_user:P@ssw0rd9988@db.internal.acme.corp:5432/main_db
+Auth Header: Bearer sk-live-998811223344556677889900aabbccdd
+Contact Customer: alex.rivas@acme.corp (Card: 4532-8899-1122-3344)`;
 
-  const demoScrubbedText = `User [ID_1] reported timeout on api.acme.cloud.
-Auth header: Bearer [SECRET_1]
-Contact user at [EMAIL_1] or call [PHONE_1].
-Client IPv4: [IP_1] | GPS Lat: [LOCATION_1]`;
+  const demoScrubbedText = `// Production Incident Crash Dump
+Host: [IP_1] | Environment: AWS_PROD
+Database URL: postgresql://[SECRET_1]
+Auth Header: Bearer [SECRET_2]
+Contact Customer: [EMAIL_1] (Card: [CARD_1])`;
 
   return (
-    <div className="space-y-16 pb-12 animate-fade-in">
-      {/* HERO SECTION WITH AI THINKING ORBS */}
-      <section className="relative text-center max-w-4xl mx-auto pt-6 pb-4 space-y-8">
-        {/* Animated AI Thinking Orbs in Center-Top */}
-        <div className="relative w-36 h-36 mx-auto flex items-center justify-center">
-          {/* Orbital glowing pulse ring 1 */}
+    <div className="space-y-16 py-4 sm:py-8">
+      {/* HERO SECTION */}
+      <section className="text-center space-y-8 max-w-4xl mx-auto px-4">
+        {/* Dynamic AI Thinking Orb with Signature Bracket Logo */}
+        <div className="relative flex items-center justify-center mx-auto mb-2 w-28 h-28 sm:w-36 sm:h-36">
+          {/* Outer Pulsing Aura */}
           <div className="absolute inset-0 rounded-full bg-[var(--accent)] opacity-20 blur-2xl animate-pulse" />
-          {/* Orbital glowing pulse ring 2 */}
-          <div className="absolute -inset-3 rounded-full border border-[var(--accent)] opacity-30 animate-spin-slow" />
-          {/* Orbital ring 3 */}
-          <div className="absolute -inset-6 rounded-full border border-dashed border-[var(--line)] opacity-50" />
 
-          {/* Central AI Thinking Core */}
-          <div className="relative w-20 h-20 rounded-2xl bg-gradient-to-tr from-[var(--surface-sunken)] to-[var(--panel)] border-2 border-[var(--accent)] flex items-center justify-center shadow-2xl group hover:scale-105 transition-transform">
+          {/* Rotating Orbital Rings */}
+          <div
+            className="absolute inset-1 rounded-full border border-[var(--accent)] opacity-40 animate-spin-slow"
+            style={{ animationDuration: '14s' }}
+          />
+          <div
+            className="absolute inset-3 rounded-full border border-dashed border-[var(--accent)] opacity-30 animate-spin-slow"
+            style={{ animationDuration: '22s', animationDirection: 'reverse' }}
+          />
+
+          {/* Center Logo Bubble */}
+          <div className="relative z-10 w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-[var(--panel)] border-2 border-[var(--line)] flex items-center justify-center shadow-xl">
             <svg
-              className="w-10 h-10 animate-bounce-subtle"
+              className="w-9 h-9 sm:w-11 sm:h-11"
               viewBox="0 0 64 64"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
             >
-              <rect width="64" height="64" rx="14" fill="var(--surface-sunken)" />
               <path
                 d="M18 15h-7v34h7M46 15h7v34h-7"
                 fill="none"
@@ -119,7 +116,7 @@ Client IPv4: [IP_1] | GPS Lat: [LOCATION_1]`;
           </h1>
 
           <p className="text-base sm:text-lg text-[var(--muted)] leading-relaxed max-w-2xl mx-auto">
-            The browser-local privacy desk. Scrub text, replace prompt secrets with reversible constants, strip EXIF metadata, and redact screenshots entirely in memory.
+            The browser-local privacy desk. Strip invisible AI watermarks, mask prompt secrets with reversible constants, remove C2PA/EXIF metadata, and redact screenshots entirely in memory.
           </p>
         </div>
 
@@ -226,23 +223,23 @@ Client IPv4: [IP_1] | GPS Lat: [LOCATION_1]`;
         </div>
       </section>
 
-      {/* 4 CORE ENGINES BENTO GRID */}
+      {/* 5 CORE ENGINES BENTO GRID */}
       <section className="space-y-6 max-w-5xl mx-auto">
         <div className="text-center space-y-2">
-          <span className="badge-emerald">Four Dedicated Engines</span>
+          <span className="badge-emerald">Five Dedicated Engines</span>
           <h2 className="text-2xl sm:text-4xl font-headline font-bold text-[var(--text)]">
-            The Complete Browser-Local Privacy Desk
+            The Complete Browser-Local Privacy Suite
           </h2>
           <p className="text-sm text-[var(--muted)] max-w-xl mx-auto">
             Choose the exact engine required for your task. Zero configuration, zero cloud roundtrips.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pt-4">
           {/* Card 1: Text Scrubber */}
           <div
             onClick={() => onSelectTool('scrub')}
-            className="p-6 sm:p-8 rounded-3xl bg-[var(--panel)] border border-[var(--line)] hover:border-[var(--accent)] cursor-pointer group transition-all duration-300 hover:-translate-y-1 shadow-lg space-y-4"
+            className="p-6 rounded-3xl bg-[var(--panel)] border border-[var(--line)] hover:border-[var(--accent)] cursor-pointer group transition-all duration-300 hover:-translate-y-1 shadow-lg space-y-4"
           >
             <div className="w-12 h-12 rounded-2xl bg-[var(--accent-tint)] text-[var(--accent)] flex items-center justify-center group-hover:scale-110 transition-transform">
               <FileCode2 size={24} />
@@ -254,7 +251,7 @@ Client IPv4: [IP_1] | GPS Lat: [LOCATION_1]`;
                 </h3>
                 <ArrowRight size={16} className="text-[var(--muted)] group-hover:text-[var(--accent)] group-hover:translate-x-1 transition-all" />
               </div>
-              <p className="text-xs sm:text-sm text-[var(--muted)] leading-relaxed">
+              <p className="text-xs text-[var(--muted)] leading-relaxed">
                 Scan logs, emails, and source code against 8 built-in detectors + custom regex rules. Side-by-side diff inspector with token dictionary export.
               </p>
             </div>
@@ -263,7 +260,7 @@ Client IPv4: [IP_1] | GPS Lat: [LOCATION_1]`;
           {/* Card 2: Prompt Enhancer */}
           <div
             onClick={() => onSelectTool('prompt')}
-            className="p-6 sm:p-8 rounded-3xl bg-[var(--panel)] border border-[var(--line)] hover:border-[var(--accent)] cursor-pointer group transition-all duration-300 hover:-translate-y-1 shadow-lg space-y-4"
+            className="p-6 rounded-3xl bg-[var(--panel)] border border-[var(--line)] hover:border-[var(--accent)] cursor-pointer group transition-all duration-300 hover:-translate-y-1 shadow-lg space-y-4"
           >
             <div className="w-12 h-12 rounded-2xl bg-[var(--accent-tint)] text-[var(--accent)] flex items-center justify-center group-hover:scale-110 transition-transform">
               <Bot size={24} />
@@ -271,20 +268,44 @@ Client IPv4: [IP_1] | GPS Lat: [LOCATION_1]`;
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold font-headline text-[var(--text)]">
-                  2. Prompt Enhancer & Unmasker
+                  2. Prompt Enhancer
                 </h3>
                 <ArrowRight size={16} className="text-[var(--muted)] group-hover:text-[var(--accent)] group-hover:translate-x-1 transition-all" />
               </div>
-              <p className="text-xs sm:text-sm text-[var(--muted)] leading-relaxed">
+              <p className="text-xs text-[var(--muted)] leading-relaxed">
                 Mask confidential variables with constants (`{'{{API_KEY_1}}'}`), download a session key, query ChatGPT/Claude safely, and restore AI responses in 1 click.
               </p>
             </div>
           </div>
 
-          {/* Card 3: Metadata Desk */}
+          {/* Card 3: AI Watermark Remover (NEW) */}
+          <div
+            onClick={() => onSelectTool('watermark')}
+            className="p-6 rounded-3xl bg-[var(--panel)] border-2 border-[var(--accent)] hover:scale-[1.02] cursor-pointer group transition-all duration-300 shadow-xl space-y-4 relative overflow-hidden"
+          >
+            <div className="absolute top-3 right-3">
+              <span className="badge-emerald text-[10px]">NEW</span>
+            </div>
+            <div className="w-12 h-12 rounded-2xl bg-[var(--accent)] text-[var(--accent-ink)] flex items-center justify-center group-hover:scale-110 transition-transform font-bold">
+              <Sparkles size={24} />
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold font-headline text-[var(--text)]">
+                  3. AI Watermark Remover
+                </h3>
+                <ArrowRight size={16} className="text-[var(--accent)] group-hover:translate-x-1 transition-all" />
+              </div>
+              <p className="text-xs text-[var(--muted)] leading-relaxed">
+                Strip Anthropic Claude invisible zero-width watermarks (`\u200B`, `\uFEFF`), normalize synthetic spaces, revert homoglyphs, and remove AI signature cadences.
+              </p>
+            </div>
+          </div>
+
+          {/* Card 4: Metadata & C2PA Desk */}
           <div
             onClick={() => onSelectTool('metadata')}
-            className="p-6 sm:p-8 rounded-3xl bg-[var(--panel)] border border-[var(--line)] hover:border-[var(--accent)] cursor-pointer group transition-all duration-300 hover:-translate-y-1 shadow-lg space-y-4"
+            className="p-6 rounded-3xl bg-[var(--panel)] border border-[var(--line)] hover:border-[var(--accent)] cursor-pointer group transition-all duration-300 hover:-translate-y-1 shadow-lg space-y-4"
           >
             <div className="w-12 h-12 rounded-2xl bg-[var(--accent-tint)] text-[var(--accent)] flex items-center justify-center group-hover:scale-110 transition-transform">
               <FileSpreadsheet size={24} />
@@ -292,20 +313,20 @@ Client IPv4: [IP_1] | GPS Lat: [LOCATION_1]`;
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold font-headline text-[var(--text)]">
-                  3. Metadata Desk
+                  4. Metadata & C2PA Desk
                 </h3>
                 <ArrowRight size={16} className="text-[var(--muted)] group-hover:text-[var(--accent)] group-hover:translate-x-1 transition-all" />
               </div>
-              <p className="text-xs sm:text-sm text-[var(--muted)] leading-relaxed">
-                Deep EXIF/GPS viewer, in-place tag editor, and 1-click total binary stripper for JPEG, PNG, PDF documents, and MP3 audio containers.
+              <p className="text-xs text-[var(--muted)] leading-relaxed">
+                Inspect C2PA Content Credentials (ChatGPT, DALL·E 3, Nano Banana), edit author tags, or strip 100% of EXIF/GPS data client-side.
               </p>
             </div>
           </div>
 
-          {/* Card 4: Visual Redactor */}
+          {/* Card 5: Visual Redactor */}
           <div
             onClick={() => onSelectTool('media')}
-            className="p-6 sm:p-8 rounded-3xl bg-[var(--panel)] border border-[var(--line)] hover:border-[var(--accent)] cursor-pointer group transition-all duration-300 hover:-translate-y-1 shadow-lg space-y-4"
+            className="p-6 rounded-3xl bg-[var(--panel)] border border-[var(--line)] hover:border-[var(--accent)] cursor-pointer group transition-all duration-300 hover:-translate-y-1 shadow-lg space-y-4 md:col-span-2 lg:col-span-2"
           >
             <div className="w-12 h-12 rounded-2xl bg-[var(--accent-tint)] text-[var(--accent)] flex items-center justify-center group-hover:scale-110 transition-transform">
               <ImageIcon size={24} />
@@ -313,12 +334,12 @@ Client IPv4: [IP_1] | GPS Lat: [LOCATION_1]`;
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold font-headline text-[var(--text)]">
-                  4. Visual Media Redactor
+                  5. Visual Media Redactor
                 </h3>
                 <ArrowRight size={16} className="text-[var(--muted)] group-hover:text-[var(--accent)] group-hover:translate-x-1 transition-all" />
               </div>
-              <p className="text-xs sm:text-sm text-[var(--muted)] leading-relaxed">
-                Interactive HTML5 Canvas tool to blur faces, pixelate sensitive numbers, and black out private credentials in screenshots before public sharing.
+              <p className="text-xs text-[var(--muted)] leading-relaxed">
+                Interactive HTML5 Canvas tool to blur faces, pixelate sensitive credentials, and black out private numbers in screenshots before public sharing.
               </p>
             </div>
           </div>
@@ -341,9 +362,9 @@ Client IPv4: [IP_1] | GPS Lat: [LOCATION_1]`;
         </div>
         <div className="p-5 rounded-2xl bg-[var(--surface-sunken)] border border-[var(--line)] text-center space-y-1">
           <span className="text-2xl sm:text-3xl font-headline font-bold text-[var(--text)]">
-            8+
+            5
           </span>
-          <p className="text-xs text-[var(--muted)] font-mono">Detector Classes</p>
+          <p className="text-xs text-[var(--muted)] font-mono">Dedicated Engines</p>
         </div>
         <div className="p-5 rounded-2xl bg-[var(--surface-sunken)] border border-[var(--line)] text-center space-y-1">
           <span className="text-2xl sm:text-3xl font-headline font-bold text-[var(--accent)]">

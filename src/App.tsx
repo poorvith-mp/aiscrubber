@@ -32,11 +32,13 @@ import { MetadataWorkspace } from './components/MetadataWorkspace';
 import { PageLoader } from './components/PageLoader';
 import { PromptEnhancerWorkspace } from './components/PromptEnhancerWorkspace';
 import { ScrubberWorkspace } from './components/ScrubberWorkspace';
+import { WatermarkWorkspace } from './components/WatermarkWorkspace';
 
 export type ToolView =
   | 'home'
   | 'scrub'
   | 'prompt'
+  | 'watermark'
   | 'metadata'
   | 'media'
   | 'docs'
@@ -98,32 +100,24 @@ function GithubIcon({ className = 'w-4 h-4' }: { className?: string }) {
 
 export function App() {
   // Light mode as default
-  const [light, setLight] = useState(true);
+  const [light, setLight] = useState<boolean>(() => {
+    const saved = localStorage.getItem('theme');
+    if (saved) return saved === 'light';
+    return true; // Default light
+  });
+
   const [currentView, setCurrentView] = useState<ToolView>('home');
+  const [isSwitching, setIsSwitching] = useState<boolean>(false);
   const [starCount, setStarCount] = useState<number | null>(null);
-  const [isSwitching, setIsSwitching] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
 
-  // Sync with URL hash
+  // Sync theme
   useEffect(() => {
-    const handleHash = () => {
-      const hash = window.location.hash.replace('#', '') as ToolView;
-      if (
-        ['home', 'scrub', 'prompt', 'metadata', 'media', 'docs', 'legal', 'about'].includes(
-          hash
-        )
-      ) {
-        setCurrentView(hash);
-      } else {
-        setCurrentView('home');
-      }
-    };
-    handleHash();
-    window.addEventListener('hashchange', handleHash);
-    return () => window.removeEventListener('hashchange', handleHash);
-  }, []);
+    document.documentElement.setAttribute('data-theme', light ? 'light' : 'dark');
+    localStorage.setItem('theme', light ? 'light' : 'dark');
+  }, [light]);
 
-  // Fetch live GitHub stars for aiscrubber repo
+  // Fetch live GitHub Stars
   useEffect(() => {
     async function fetchStars() {
       try {
@@ -135,51 +129,85 @@ export function App() {
             return;
           }
         }
-        const fallbackRes = await fetch('https://api.github.com/repos/Poorvith-M/aiscrubber');
-        if (fallbackRes.ok) {
-          const fbData = await fallbackRes.json();
+        // Fallback repo check
+        const fallback = await fetch('https://api.github.com/repos/Poorvith-M/aiscrubber');
+        if (fallback.ok) {
+          const fbData = await fallback.json();
           if (typeof fbData.stargazers_count === 'number') {
             setStarCount(fbData.stargazers_count);
           }
         }
-      } catch {
-        // Silently fallback
+      } catch (err) {
+        console.warn('Could not fetch live stars', err);
       }
     }
     fetchStars();
   }, []);
 
-  const switchView = (view: ToolView) => {
+  // Sync hash routing
+  useEffect(() => {
+    function handleHashChange() {
+      const hash = window.location.hash.replace('#', '') as ToolView;
+      if (
+        [
+          'home',
+          'scrub',
+          'prompt',
+          'watermark',
+          'metadata',
+          'media',
+          'docs',
+          'legal',
+          'about',
+        ].includes(hash)
+      ) {
+        setCurrentView(hash);
+      }
+    }
+
+    if (window.location.hash) {
+      handleHashChange();
+    }
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  function switchView(view: ToolView) {
     if (view === currentView) return;
     setIsSwitching(true);
     setCurrentView(view);
     window.location.hash = view;
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    setTimeout(() => setIsSwitching(false), 240);
-  };
 
-  useEffect(() => {
-    document.documentElement.dataset.theme = light ? 'light' : 'dark';
-  }, [light]);
+    // Brief smooth view switch animation
+    setTimeout(() => {
+      setIsSwitching(false);
+    }, 180);
+  }
 
   return (
-    <div className="site-shell min-h-screen flex flex-col justify-between">
-      {/* Top Navigation */}
+    <div className="min-h-screen flex flex-col bg-[var(--bg)] text-[var(--text)] transition-colors duration-200 selection:bg-[var(--accent)] selection:text-[var(--accent-ink)]">
+      {/* Sticky Top Header Navigation */}
       <header className="site-header">
         <div className="flex items-center gap-6">
+          {/* Logo & Product Identity */}
           <button
             type="button"
             onClick={() => switchView('home')}
-            className="flex items-center gap-2.5 text-left bg-transparent border-0 cursor-pointer p-0"
-            aria-label="AIScrubber home"
+            className="flex items-center gap-3 bg-transparent border-0 cursor-pointer p-0 text-left group"
           >
-            <OriginalLogo className="w-8 h-8 shrink-0" />
-            <span className="font-headline font-bold text-lg tracking-tight text-[var(--text)]">
-              AI<span className="text-[var(--accent)]">scrubber</span>
-            </span>
+            <OriginalLogo className="w-8 h-8 group-hover:scale-105 transition-transform" />
+            <div className="flex flex-col">
+              <span className="font-headline font-bold text-lg tracking-tight leading-none text-[var(--text)]">
+                AIScrubber
+              </span>
+              <span className="font-mono text-[10px] text-[var(--accent)] font-semibold tracking-wider uppercase">
+                Privacy & Redaction Suite
+              </span>
+            </div>
           </button>
 
-          {/* Desktop Navigation Switcher */}
+          {/* Desktop Navigation Tabs */}
           <nav className="hidden lg:flex items-center gap-1 bg-[var(--surface-sunken)] p-1 rounded-xl border border-[var(--line)]">
             <button
               type="button"
@@ -203,7 +231,15 @@ export function App() {
               className={`nav-pill ${currentView === 'prompt' ? 'active' : ''}`}
             >
               <Bot size={14} />
-              Prompt Enhancer
+              Prompt Masker
+            </button>
+            <button
+              type="button"
+              onClick={() => switchView('watermark')}
+              className={`nav-pill ${currentView === 'watermark' ? 'active' : ''}`}
+            >
+              <Sparkles size={14} />
+              AI Watermark
             </button>
             <button
               type="button"
@@ -211,7 +247,7 @@ export function App() {
               className={`nav-pill ${currentView === 'metadata' ? 'active' : ''}`}
             >
               <FileSpreadsheet size={14} />
-              Metadata Desk
+              Metadata & C2PA
             </button>
             <button
               type="button"
@@ -311,14 +347,21 @@ export function App() {
           onClick={() => switchView('prompt')}
           className={`nav-pill whitespace-nowrap text-xs ${currentView === 'prompt' ? 'active' : ''}`}
         >
-          Prompt Enhancer
+          Prompt Masker
+        </button>
+        <button
+          type="button"
+          onClick={() => switchView('watermark')}
+          className={`nav-pill whitespace-nowrap text-xs ${currentView === 'watermark' ? 'active' : ''}`}
+        >
+          AI Watermark
         </button>
         <button
           type="button"
           onClick={() => switchView('metadata')}
           className={`nav-pill whitespace-nowrap text-xs ${currentView === 'metadata' ? 'active' : ''}`}
         >
-          Metadata Desk
+          Metadata & C2PA
         </button>
         <button
           type="button"
@@ -361,6 +404,7 @@ export function App() {
               {currentView === 'home' && <HomeWorkspace onSelectTool={switchView} />}
               {currentView === 'scrub' && <ScrubberWorkspace />}
               {currentView === 'prompt' && <PromptEnhancerWorkspace />}
+              {currentView === 'watermark' && <WatermarkWorkspace />}
               {currentView === 'metadata' && <MetadataWorkspace />}
               {currentView === 'media' && <MediaRedactorWorkspace />}
               {currentView === 'docs' && <DocsWorkspace />}
@@ -398,6 +442,13 @@ export function App() {
               className="hover:text-[var(--text)] cursor-pointer"
             >
               Home
+            </button>
+            <button
+              type="button"
+              onClick={() => switchView('watermark')}
+              className="hover:text-[var(--text)] cursor-pointer"
+            >
+              AI Watermarks
             </button>
             <button
               type="button"

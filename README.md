@@ -7,7 +7,7 @@
     <a href="https://aiscrubber.poorvithmp.com"><b>🌐 Live Web Suite</b></a> ·
     <a href="#cli-quickstart"><b>💻 CLI Reference</b></a> ·
     <a href="#mcp-server-setup"><b>🤖 MCP Server Setup</b></a> ·
-    <a href="#core-features"><b>✨ Features</b></a> ·
+    <a href="#core-features"><b>✨ 5 Privacy Engines</b></a> ·
     <a href="https://poorvithmp.com"><b>👨‍💻 Founder</b></a>
   </p>
 </div>
@@ -22,7 +22,7 @@ Everything runs **100% in local memory**—zero telemetry, zero server roundtrip
 
 ---
 
-## ✨ 4 Privacy Engines
+## ✨ 5 Dedicated Privacy Engines
 
 ### 1. 📝 Text Scrubber
 - Scans input text and incident logs against **8 built-in detector classes** (Emails, API Keys & Bearer Tokens, IPv4/IPv6, Phone Numbers, Payment Cards, Customer/System IDs, SSN).
@@ -36,13 +36,18 @@ Everything runs **100% in local memory**—zero telemetry, zero server roundtrip
 - **Step 3 (Query AI):** Paste the masked prompt to ChatGPT or Claude.
 - **Step 4 (1-Click Reconstruct):** Paste the AI's generated response and session key to unmask all original variables back into working code.
 
-### 3. 🖼️ Metadata Desk (Viewer, Editor & Stripper)
-- In-browser parsing of JPEG (EXIF/GPS/IPTC), PNG chunks, PDF `/Info` dictionaries, and Audio ID3 tags.
-- GPS coordinates extractor with instant Google Maps preview links.
-- In-place field editor (Title, Author, Software, Copyright).
-- **1-Click Stripper:** Re-encodes clean pixel buffers and zeros binary tracking dictionaries.
+### 3. ✨ AI Text & Claude Watermark Remover (NEW)
+- Strips invisible Unicode zero-width watermarks (`\u200B`, `\u200C`, `\u200D`, `\uFEFF`, `\u2060`) embedded in Anthropic Claude & LLM outputs.
+- Normalizes non-standard synthetic spaces (En, Em, Thin, Hair, Narrow No-Break, Fullwidth spaces).
+- Reverts confusable Cyrillic/mathematical homoglyphs to Latin standards.
+- 4 Modes: *Aggressive (All Tiers)*, *Claude & LLM Output Clean*, *Code Safe (Preserves Indentation)*, and *Invisible Unicode Only*.
 
-### 4. 🎨 Visual Media Redactor
+### 4. 🖼️ Metadata & C2PA Provenance Desk
+- In-browser parsing of JPEG (EXIF/GPS/IPTC/XMP), PNG chunks (`tEXt`/`caPI`), PDF `/Info` dictionaries, and Audio ID3 tags.
+- **C2PA Content Credentials [CR] Inspector**: Detects cryptographic provenance manifests from ChatGPT (DALL·E 3), Nano Banana, Adobe Firefly, and Google Imagen, and extracts embedded AI generation prompts.
+- **1-Click Stripper:** Re-encodes clean pixel buffers and wipes C2PA tracking fingerprints.
+
+### 5. 🎨 Visual Media Redactor
 - HTML5 Canvas interactive tool to draw redaction boxes on screenshots and images.
 - Tools: **Gaussian Blur**, **Pixelate (Mosaic)**, and **Solid Blackout**.
 - Undo/redo history stack and clean high-resolution PNG export.
@@ -54,7 +59,10 @@ Everything runs **100% in local memory**—zero telemetry, zero server roundtrip
 Run the standalone CLI with zero installation via `npx`:
 
 ```bash
-# Scrub sensitive logs into safe numbered labels
+# Strip Claude & AI invisible Unicode zero-width watermarks
+npx aiscrubber clean-watermarks ./claude-output.md -o ./clean-article.md
+
+# Scrub sensitive incident logs into safe numbered labels
 npx aiscrubber scrub ./logs/production-crash.log --output ./logs/clean.log
 
 # Mask prompt secrets for AI and save session key
@@ -63,7 +71,7 @@ npx aiscrubber mask "Connect postgres://admin:P@ssw0rd@db.internal:5432" --key s
 # Unmask AI response with your session key
 npx aiscrubber unmask ./ai-response.py --key session.aiscrub.json --output ./final-code.py
 
-# Strip metadata from documents and images
+# Strip metadata & C2PA manifests from documents and images
 npx aiscrubber strip-metadata ./photos/*.jpg ./reports/*.pdf
 ```
 
@@ -89,6 +97,7 @@ Add the following to your `claude_desktop_config.json`:
 ```
 
 ### Exposed MCP Tools:
+- `clean_ai_watermarks`: Strips invisible Unicode zero-width watermarks (Anthropic Claude & ChatGPT markers), normalizes non-standard spaces, and reverts homoglyphs.
 - `scrub_text`: Sanitizes raw logs and text into `[EMAIL_1]`, `[SECRET_1]`, `[IP_1]`.
 - `mask_prompt`: Masks secrets into `{{KEY_1}}` constants and outputs session key JSON.
 - `unmask_response`: Restores original variables back into returned AI output.

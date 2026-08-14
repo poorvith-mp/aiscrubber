@@ -7,7 +7,6 @@
  */
 
 import readline from 'node:readline';
-import fs from 'node:fs';
 
 const SERVER_NAME = 'aiscrubber-mcp';
 const SERVER_VERSION = '2.2.0';
@@ -44,6 +43,53 @@ const DETECTORS = {
     tokenPrefix: 'ID',
   },
 };
+
+const HOMOGLYPH_MAP = {
+  'а': 'a', 'А': 'A', 'с': 'c', 'С': 'C', 'е': 'e', 'Е': 'E', 'о': 'o', 'О': 'O',
+  'р': 'p', 'Р': 'P', 'ѕ': 's', 'Ѕ': 'S', 'х': 'x', 'Х': 'X', 'у': 'y', 'У': 'Y',
+  'і': 'i', 'І': 'I', 'ј': 'j', 'Ј': 'J',
+  '–': '-', '—': '-', '‘': "'", '’': "'", '“': '"', '”': '"',
+};
+
+function cleanWatermarkContent(text) {
+  let cleaned = text;
+  let zeroWidthCount = 0;
+  let spacesCount = 0;
+  let homoglyphsCount = 0;
+
+  // Zero-width & invisible Unicode
+  const zwRegex = /[\u200B\u200C\u200D\uFEFF\u2060\u180E\u00AD\u034F\u061C\u17B4\u17B5\u200E\u200F\u202A-\u202E\u2066-\u2069]/g;
+  const zwMatches = cleaned.match(zwRegex);
+  if (zwMatches) {
+    zeroWidthCount = zwMatches.length;
+    cleaned = cleaned.replace(zwRegex, '');
+  }
+
+  // Non-standard spaces
+  const spaceRegex = /[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g;
+  const spMatches = cleaned.match(spaceRegex);
+  if (spMatches) {
+    spacesCount = spMatches.length;
+    cleaned = cleaned.replace(spaceRegex, ' ');
+  }
+
+  // Homoglyphs
+  cleaned = cleaned.replace(/[а-яА-ЯёЁіІјЈѕЅ–—‘’“”]/g, (m) => {
+    if (HOMOGLYPH_MAP[m]) {
+      homoglyphsCount++;
+      return HOMOGLYPH_MAP[m];
+    }
+    return m;
+  });
+
+  return {
+    cleaned_text: cleaned,
+    zero_width_stripped: zeroWidthCount,
+    spaces_normalized: spacesCount,
+    homoglyphs_reverted: homoglyphsCount,
+    total_anomalies_cleaned: zeroWidthCount + spacesCount + homoglyphsCount,
+  };
+}
 
 function scrubContent(text) {
   let scrubbed = text;
@@ -127,6 +173,17 @@ function unmaskContent(aiResponse, sessionKey) {
 
 const TOOLS = [
   {
+    name: 'clean_ai_watermarks',
+    description: 'Strip invisible Unicode zero-width watermarks (Anthropic Claude / ChatGPT markers), normalize non-standard spaces, and revert homoglyphs.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'Raw AI-generated text to strip watermarks from' },
+      },
+      required: ['text'],
+    },
+  },
+  {
     name: 'scrub_text',
     description: 'Scrub PII, emails, API keys, passwords, IPs, and sensitive credentials into numbered safe tokens.',
     inputSchema: {
@@ -194,6 +251,22 @@ function handleMessage(msg) {
 
   if (method === 'tools/call') {
     const { name, arguments: args } = params || {};
+
+    if (name === 'clean_ai_watermarks') {
+      const result = cleanWatermarkContent(args?.text || '');
+      return {
+        jsonrpc: '2.0',
+        id,
+        result: {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        },
+      };
+    }
 
     if (name === 'scrub_text') {
       const result = scrubContent(args?.text || '');
