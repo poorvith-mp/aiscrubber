@@ -1,8 +1,14 @@
 {
   "name": "aiscrubber",
-  "private": true,
-  "version": "2.1.0",
+  "version": "2.2.0",
+  "description": "Zero-telemetry browser-local privacy desk, CLI, and MCP server to scrub secrets before sharing with LLMs.",
+  "author": "Poorvith M P <https://poorvithmp.com>",
+  "license": "MIT",
   "type": "module",
+  "bin": {
+    "aiscrubber": "./bin/aiscrubber.js",
+    "aiscrubber-mcp": "./bin/aiscrubber-mcp.js"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.app.json && vite build",

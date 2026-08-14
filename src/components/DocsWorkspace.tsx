@@ -31,7 +31,7 @@ import { useMemo, useState } from 'react';
 
 interface DocArticle {
   id: string;
-  category: 'getting-started' | 'features' | 'best-practices' | 'use-cases' | 'reference';
+  category: 'getting-started' | 'features' | 'developer-tools' | 'use-cases' | 'best-practices';
   categoryLabel: string;
   title: string;
   description: string;
@@ -50,7 +50,6 @@ export function DocsWorkspace() {
     setTimeout(() => setCopiedSnippet(null), 1800);
   };
 
-  // Mock data snippets for interactive recipes
   const mockNginxLog = `2026-08-14 10:23:41 [ERROR] 1420#0: *88329 upstream timed out while reading response header from upstream, client: 192.168.1.144, server: api.acme-corp.com, request: "POST /v1/auth/token HTTP/1.1", sub: "CUST-99214", auth_header: "Bearer sk-live-99881122334455667788", user_email: "alex.rivas@acme.com", host: "internal-db.acme.cloud:5432"`;
 
   const mockDbPrompt = `Help me write a Python SQLAlchemy migration for our billing database.
@@ -66,6 +65,15 @@ GPSLatitude: 12.9716 N
 GPSLongitude: 77.5946 E
 GPSAltitude: 920m (Bengaluru, India)`;
 
+  const mcpConfigJson = `{
+  "mcpServers": {
+    "aiscrubber": {
+      "command": "npx",
+      "args": ["-y", "aiscrubber-mcp"]
+    }
+  }
+}`;
+
   const articles: DocArticle[] = useMemo(
     () => [
       {
@@ -74,7 +82,7 @@ GPSAltitude: 920m (Bengaluru, India)`;
         categoryLabel: 'Getting Started',
         title: 'AIScrubber Overview',
         description:
-          'A browser-local identity redaction desk designed for the moment before sensitive text or media travels to AI services or public channels.',
+          'A browser-local privacy desk and developer toolkit designed for the moment before sensitive text or media travels to AI services or public channels.',
         headings: [
           { id: 'why-aiscrubber', title: 'Why AIScrubber Exists' },
           { id: 'core-architecture', title: 'Client-Side Architecture' },
@@ -92,12 +100,12 @@ GPSAltitude: 920m (Bengaluru, India)`;
                 Core Security Guarantee
               </strong>
               <p className="text-xs text-emerald-200/90">
-                100% of data processing occurs in local browser memory. Text pattern matching, HTML5 canvas redactions, and binary EXIF stripping never make network requests.
+                100% of data processing occurs in local browser memory or local Node.js processes. Text pattern matching, HTML5 canvas redactions, and binary EXIF stripping never make external network requests.
               </p>
             </div>
 
             <h4 id="core-architecture" className="text-base font-bold text-[var(--text)] pt-2">
-              Four Specialized Privacy Engines
+              Four Privacy Engines + Developer Tooling
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="p-3.5 rounded-xl bg-[var(--surface-sunken)] border border-[var(--line)] space-y-1.5">
@@ -137,13 +145,119 @@ GPSAltitude: 920m (Bengaluru, India)`;
                 </p>
               </div>
             </div>
-
-            <h4 id="privacy-guarantee" className="text-base font-bold text-[var(--text)] pt-2">
-              Verification in DevTools
+          </div>
+        ),
+      },
+      {
+        id: 'cli-reference',
+        category: 'developer-tools',
+        categoryLabel: 'Developer Tools',
+        title: 'AIScrubber Developer CLI',
+        description:
+          'Run zero-install privacy scrubbing, prompt masking, and EXIF stripping directly in your terminal using npx.',
+        headings: [
+          { id: 'cli-quickstart', title: 'CLI Quickstart' },
+          { id: 'cli-commands', title: 'Supported Commands' },
+          { id: 'cli-automation', title: 'Automated CI & Scripting' },
+        ],
+        content: (
+          <div className="space-y-6 text-sm text-[var(--muted)] leading-relaxed">
+            <h4 id="cli-quickstart" className="text-base font-bold text-[var(--text)]">
+              Quickstart with Zero Installation
             </h4>
             <p>
-              Open DevTools (<kbd className="font-mono bg-[var(--panel)] px-1 rounded">F12</kbd>), switch to the <strong>Network</strong> tab, and test any feature. You will see zero outbound telemetry or payload transmissions.
+              You can run the AIScrubber CLI immediately with any Node.js environment:
             </p>
+
+            <div className="rounded-xl bg-[var(--surface-sunken)] border border-[var(--line)] p-4 font-mono text-xs overflow-x-auto space-y-2">
+              <div className="flex items-center justify-between pb-2 border-b border-[var(--line)] text-[var(--muted)]">
+                <span>Terminal Command</span>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard('npx aiscrubber scrub ./logs/crash.log -o ./logs/clean.log', 'clip1')}
+                  className="text-xs text-[var(--accent)] hover:underline flex items-center gap-1 font-sans font-bold"
+                >
+                  {copiedSnippet === 'clip1' ? <Check size={13} /> : <Clipboard size={13} />}
+                  {copiedSnippet === 'clip1' ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+              <pre className="text-[var(--accent)]">$ npx aiscrubber scrub ./logs/crash.log -o ./logs/clean.log</pre>
+            </div>
+
+            <h4 id="cli-commands" className="text-base font-bold text-[var(--text)] pt-2">
+              Available CLI Commands
+            </h4>
+            <div className="space-y-3 text-xs">
+              <div className="p-3 rounded-lg bg-[var(--panel)] border border-[var(--line)] space-y-1">
+                <code className="text-[var(--accent)] font-bold block">npx aiscrubber scrub &lt;file | text&gt; [-o out.txt]</code>
+                <span>Replaces emails, API keys, bearer tokens, IP addresses, and IDs with numbered tokens.</span>
+              </div>
+              <div className="p-3 rounded-lg bg-[var(--panel)] border border-[var(--line)] space-y-1">
+                <code className="text-[var(--accent)] font-bold block">npx aiscrubber mask &lt;prompt&gt; --key session.aiscrub.json</code>
+                <span>Masks confidential database URLs and API keys with constants and saves an unmasking session key.</span>
+              </div>
+              <div className="p-3 rounded-lg bg-[var(--panel)] border border-[var(--line)] space-y-1">
+                <code className="text-[var(--accent)] font-bold block">npx aiscrubber unmask &lt;ai-file&gt; --key session.aiscrub.json</code>
+                <span>Reconstructs original variables back into the returned AI generated output.</span>
+              </div>
+              <div className="p-3 rounded-lg bg-[var(--panel)] border border-[var(--line)] space-y-1">
+                <code className="text-[var(--accent)] font-bold block">npx aiscrubber strip-metadata &lt;files...&gt;</code>
+                <span>Wipes EXIF GPS tags from images and zeros `/Info` dictionaries in PDF documents.</span>
+              </div>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'mcp-setup',
+        category: 'developer-tools',
+        categoryLabel: 'Developer Tools',
+        title: 'Model Context Protocol (MCP) Server',
+        description:
+          'Connect AIScrubber directly to Claude Desktop, Claude Code CLI, and Cursor as an official native MCP server.',
+        headings: [
+          { id: 'claude-desktop-config', title: 'Claude Desktop Setup' },
+          { id: 'mcp-tools', title: 'Exposed MCP Tools' },
+          { id: 'cursor-integration', title: 'Cursor & IDE Integration' },
+        ],
+        content: (
+          <div className="space-y-6 text-sm text-[var(--muted)] leading-relaxed">
+            <h4 id="claude-desktop-config" className="text-base font-bold text-[var(--text)]">
+              Claude Desktop Configuration
+            </h4>
+            <p>
+              Add the AIScrubber MCP server to your <code className="font-mono text-[var(--text)] bg-[var(--surface-sunken)] px-1.5 py-0.5 rounded">claude_desktop_config.json</code>:
+            </p>
+
+            <div className="rounded-xl bg-[var(--surface-sunken)] border border-[var(--line)] p-4 font-mono text-xs overflow-x-auto">
+              <div className="flex items-center justify-between pb-2 mb-2 border-b border-[var(--line)] text-[var(--muted)]">
+                <span>claude_desktop_config.json</span>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(mcpConfigJson, 'mcp')}
+                  className="text-xs text-[var(--accent)] hover:underline flex items-center gap-1 font-sans font-bold"
+                >
+                  {copiedSnippet === 'mcp' ? <Check size={13} /> : <Clipboard size={13} />}
+                  {copiedSnippet === 'mcp' ? 'Copied' : 'Copy JSON'}
+                </button>
+              </div>
+              <pre className="text-[var(--text)] whitespace-pre-wrap">{mcpConfigJson}</pre>
+            </div>
+
+            <h4 id="mcp-tools" className="text-base font-bold text-[var(--text)] pt-2">
+              Exposed MCP Tools for AI Agents
+            </h4>
+            <ul className="list-disc pl-5 space-y-2 text-xs">
+              <li>
+                <strong className="text-[var(--text)]">scrub_text:</strong> Sanitizes raw logs and text into safe tokens before sending across API boundaries.
+              </li>
+              <li>
+                <strong className="text-[var(--text)]">mask_prompt:</strong> Masks secrets into <code className="text-[var(--accent)]">{'{{API_KEY_1}}'}</code> constants and generates session keys.
+              </li>
+              <li>
+                <strong className="text-[var(--text)]">unmask_response:</strong> Automatically restores original variables back into generated code.
+              </li>
+            </ul>
           </div>
         ),
       },
@@ -158,7 +272,6 @@ GPSAltitude: 920m (Bengaluru, India)`;
           { id: 'built-in-detectors', title: 'Built-in Detectors' },
           { id: 'custom-rules', title: 'Custom Regex & Keyword Rules' },
           { id: 'diff-inspection', title: 'Diff & Inspection Mode' },
-          { id: 'dictionary-export', title: 'Dictionary Key Export' },
         ],
         content: (
           <div className="space-y-6 text-sm text-[var(--muted)] leading-relaxed">
@@ -202,20 +315,6 @@ GPSAltitude: 920m (Bengaluru, India)`;
                 </div>
               </div>
             </div>
-
-            <h4 id="custom-rules" className="text-base font-bold text-[var(--text)] pt-2">
-              Custom Keyword & Regex Rules
-            </h4>
-            <p>
-              Click <strong>Custom Rules</strong> to add proprietary terms (e.g. project code-names, internal server hosts) or write custom regex patterns. Custom tokens take format `[TOKEN_N]`.
-            </p>
-
-            <h4 id="diff-inspection" className="text-base font-bold text-[var(--text)] pt-2">
-              Diff Inspector
-            </h4>
-            <p>
-              Toggle <strong>Inspect Diff</strong> to view inline highlighted badges over replaced tokens with hover tooltips showing original values and detector provenance.
-            </p>
           </div>
         ),
       },
@@ -229,7 +328,6 @@ GPSAltitude: 920m (Bengaluru, India)`;
         headings: [
           { id: 'the-roundtrip-flow', title: 'The 4-Step Roundtrip' },
           { id: 'enhancement-profiles', title: 'Enhancement Profiles' },
-          { id: 'unmasking-reconstruction', title: '1-Click Reconstruction' },
         ],
         content: (
           <div className="space-y-6 text-sm text-[var(--muted)] leading-relaxed">
@@ -254,16 +352,6 @@ GPSAltitude: 920m (Bengaluru, India)`;
                 <span>Paste the AI's response in Tab 2 + your key. Original values are reconstructed automatically.</span>
               </div>
             </div>
-
-            <h4 id="enhancement-profiles" className="text-base font-bold text-[var(--text)] pt-2">
-              Available Enhancement Directives
-            </h4>
-            <ul className="list-disc pl-5 space-y-1 text-xs">
-              <li><strong>Coding & Architecture:</strong> Adds constraints to preserve placeholder variables, include error handling, and output complete code.</li>
-              <li><strong>Debugging & Fixes:</strong> Directs AI to provide root cause analysis and minimal code patches.</li>
-              <li><strong>Data & Analysis:</strong> Requests structured executive summaries and risk ratings.</li>
-              <li><strong>Drafting & Voice:</strong> Directs authentic, direct prose without AI filler buzzwords.</li>
-            </ul>
           </div>
         ),
       },
@@ -277,7 +365,6 @@ GPSAltitude: 920m (Bengaluru, India)`;
         headings: [
           { id: 'supported-formats', title: 'Supported Formats' },
           { id: 'gps-threat-model', title: 'GPS Location Risks' },
-          { id: '1-click-stripper', title: '1-Click Stripper Mechanics' },
         ],
         content: (
           <div className="space-y-6 text-sm text-[var(--muted)] leading-relaxed">
@@ -298,20 +385,6 @@ GPSAltitude: 920m (Bengaluru, India)`;
                 <span>MP3 & WAV (ID3v1 & ID3v2 containers)</span>
               </div>
             </div>
-
-            <h4 id="gps-threat-model" className="text-base font-bold text-[var(--text)] pt-2">
-              GPS Location Vulnerability
-            </h4>
-            <p>
-              Smartphones embed exact latitude, longitude, and altitude in image EXIF tags. AIScrubber detects these coordinates and warns you with direct Google Maps preview links before you share photos.
-            </p>
-
-            <h4 id="1-click-stripper" className="text-base font-bold text-[var(--text)] pt-2">
-              How 1-Click Stripping Works
-            </h4>
-            <p>
-              For images, the stripper draws pixel buffers onto an offscreen canvas and emits a clean, re-encoded binary without APP1/EXIF segments. For PDFs and audio, binary dictionaries and ID3 headers are zeroed in memory.
-            </p>
           </div>
         ),
       },
@@ -329,7 +402,6 @@ GPSAltitude: 920m (Bengaluru, India)`;
         ],
         content: (
           <div className="space-y-8 text-sm text-[var(--muted)] leading-relaxed">
-            {/* RECIPE 1 */}
             <div id="recipe-nginx" className="p-5 rounded-2xl bg-[var(--panel)] border border-[var(--line)] space-y-4">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <span className="badge-emerald">Recipe 1</span>
@@ -342,7 +414,6 @@ GPSAltitude: 920m (Bengaluru, India)`;
                 When filing an issue for an open-source library, logs often contain internal IP addresses, Bearer tokens, and user emails.
               </p>
 
-              {/* Mock Code Block */}
               <div className="relative rounded-xl bg-[var(--surface-sunken)] border border-[var(--line)] p-4 font-mono text-xs overflow-x-auto">
                 <div className="flex items-center justify-between pb-2 mb-2 border-b border-[var(--line)] text-[var(--muted)]">
                   <span>Mock Raw Log Input</span>
@@ -357,16 +428,8 @@ GPSAltitude: 920m (Bengaluru, India)`;
                 </div>
                 <pre className="text-[var(--text)] whitespace-pre-wrap">{mockNginxLog}</pre>
               </div>
-
-              <div className="p-3 rounded-lg bg-[var(--accent-tint)] border border-[var(--accent)] text-xs space-y-1">
-                <strong className="text-[var(--text)] block font-bold">Scrubbed Result in AIScrubber:</strong>
-                <p className="font-mono text-[var(--accent)]">
-                  ... client: [IP_1], server: api.acme-corp.com, ... sub: [ID_1], auth_header: [SECRET_1], user_email: [EMAIL_1] ...
-                </p>
-              </div>
             </div>
 
-            {/* RECIPE 2 */}
             <div id="recipe-ai-db" className="p-5 rounded-2xl bg-[var(--panel)] border border-[var(--line)] space-y-4">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <span className="badge-emerald">Recipe 2</span>
@@ -393,44 +456,6 @@ GPSAltitude: 920m (Bengaluru, India)`;
                 </div>
                 <pre className="text-[var(--text)] whitespace-pre-wrap">{mockDbPrompt}</pre>
               </div>
-
-              <div className="p-3 rounded-lg bg-[var(--surface-sunken)] border border-[var(--line)] text-xs space-y-1">
-                <strong className="text-[var(--text)] block font-bold">Workflow:</strong>
-                <p>1. Paste mock prompt in <strong>Prompt Enhancer</strong> → 2. Download <code className="text-[var(--accent)]">.aiscrub.json</code> key → 3. Query LLM → 4. Paste response in Tab 2 to unmask!</p>
-              </div>
-            </div>
-
-            {/* RECIPE 3 */}
-            <div id="recipe-photo-exif" className="p-5 rounded-2xl bg-[var(--panel)] border border-[var(--line)] space-y-4">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <span className="badge-emerald">Recipe 3</span>
-                <span className="text-xs font-mono text-[var(--muted)]">EXIF Sanitization</span>
-              </div>
-              <h4 className="text-base font-bold text-[var(--text)] font-headline">
-                Wiping GPS Telemetry Before Uploading Photos
-              </h4>
-              <p className="text-xs">
-                Smartphone and DSLR photos contain precise GPS coordinates and serial numbers that expose where and when a photo was captured.
-              </p>
-
-              <div className="relative rounded-xl bg-[var(--surface-sunken)] border border-[var(--line)] p-4 font-mono text-xs overflow-x-auto">
-                <div className="flex items-center justify-between pb-2 mb-2 border-b border-[var(--line)] text-[var(--muted)]">
-                  <span>Simulated EXIF Header Dump</span>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(mockExifDump, 'exif')}
-                    className="text-xs text-[var(--accent)] hover:underline flex items-center gap-1 font-sans font-bold"
-                  >
-                    {copiedSnippet === 'exif' ? <Check size={13} /> : <Clipboard size={13} />}
-                    {copiedSnippet === 'exif' ? 'Copied' : 'Copy EXIF Spec'}
-                  </button>
-                </div>
-                <pre className="text-[var(--text)] whitespace-pre-wrap">{mockExifDump}</pre>
-              </div>
-
-              <p className="text-xs">
-                Drop the file into <strong>Metadata Desk</strong> and select <strong>1-Click Stripper</strong> to produce a 100% sanitized copy with zero location data.
-              </p>
             </div>
           </div>
         ),
@@ -445,7 +470,6 @@ GPSAltitude: 920m (Bengaluru, India)`;
         headings: [
           { id: 'pre-publish-checklist', title: 'Pre-Publishing Checklist' },
           { id: 'pattern-limits', title: 'Understanding Pattern Limits' },
-          { id: 'custom-regex-tips', title: 'Optimizing Custom Regex' },
         ],
         content: (
           <div className="space-y-6 text-sm text-[var(--muted)] leading-relaxed">
@@ -463,20 +487,9 @@ GPSAltitude: 920m (Bengaluru, India)`;
               </label>
               <label className="flex items-start gap-2.5 p-2.5 rounded-lg bg-[var(--surface-sunken)] border border-[var(--line)]">
                 <input type="checkbox" defaultChecked className="mt-0.5" />
-                <span>For images and screenshots, ensure faces and private browser tabs are blurred or blacked out.</span>
-              </label>
-              <label className="flex items-start gap-2.5 p-2.5 rounded-lg bg-[var(--surface-sunken)] border border-[var(--line)]">
-                <input type="checkbox" defaultChecked className="mt-0.5" />
                 <span>Save your <code className="text-[var(--accent)]">.aiscrub.json</code> session key in a secure local folder if you plan to unmask an AI response.</span>
               </label>
             </div>
-
-            <h4 id="pattern-limits" className="text-base font-bold text-[var(--text)] pt-2">
-              Understanding Pattern-Matching Limits
-            </h4>
-            <p>
-              AIScrubber utilizes deterministic pattern matching, not generative AI contextual understanding. This guarantees zero latency and 100% offline privacy, but means human visual review remains essential for nuanced sensitive contexts.
-            </p>
           </div>
         ),
       },
@@ -506,7 +519,7 @@ GPSAltitude: 920m (Bengaluru, India)`;
 
   return (
     <div className="workspace-panel p-0 overflow-hidden border border-[var(--line)]">
-      {/* Top Docs Sub-Header & Search Bar (Claude Code Style) */}
+      {/* Top Docs Sub-Header & Search Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 sm:px-6 bg-[var(--surface-sunken)] border-b border-[var(--line)]">
         <div className="flex items-center gap-2 text-xs text-[var(--muted)] font-mono">
           <span>Docs</span>
@@ -521,7 +534,7 @@ GPSAltitude: 920m (Bengaluru, India)`;
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]" />
           <input
             type="text"
-            placeholder="Search docs & recipes..."
+            placeholder="Search docs, CLI & MCP..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-[var(--panel)] border border-[var(--line)] text-xs text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors font-mono"
@@ -537,6 +550,7 @@ GPSAltitude: 920m (Bengaluru, India)`;
             {(
               [
                 { cat: 'getting-started', label: 'Getting Started' },
+                { cat: 'developer-tools', label: 'Developer Tools & MCP' },
                 { cat: 'features', label: 'Core Engines' },
                 { cat: 'use-cases', label: 'Use Cases & Recipes' },
                 { cat: 'best-practices', label: 'Best Practices' },
@@ -629,7 +643,7 @@ GPSAltitude: 920m (Bengaluru, India)`;
           </div>
         </main>
 
-        {/* RIGHT SIDEBAR: Table of Contents ("On this page") */}
+        {/* RIGHT SIDEBAR: Table of Contents */}
         <aside className="hidden lg:block lg:col-span-3 border-l border-[var(--line)] bg-[var(--surface-sunken)] p-6 space-y-4">
           <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--muted)] block">
             On this page
@@ -649,26 +663,14 @@ GPSAltitude: 920m (Bengaluru, India)`;
 
           <div className="pt-6 border-t border-[var(--line)] space-y-2">
             <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--muted)] block">
-              Quick Resources
+              Developer Packages
             </span>
-            <a
-              href="https://github.com/prvthmpcypher/aiscrubber"
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs text-[var(--muted)] hover:text-[var(--text)] flex items-center gap-1.5"
-            >
-              <Code2 size={13} />
-              GitHub Source Code
-            </a>
-            <a
-              href="https://poorvithmp.com"
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs text-[var(--muted)] hover:text-[var(--text)] flex items-center gap-1.5"
-            >
-              <ExternalLink size={13} />
-              Poorvith's Portfolio
-            </a>
+            <div className="p-2.5 rounded-lg bg-[var(--panel)] border border-[var(--line)] font-mono text-[11px] space-y-1">
+              <span className="text-[var(--muted)] block">CLI:</span>
+              <span className="text-[var(--accent)] font-bold">npx aiscrubber</span>
+              <span className="text-[var(--muted)] block pt-1">MCP:</span>
+              <span className="text-[var(--accent)] font-bold">npx aiscrubber-mcp</span>
+            </div>
           </div>
         </aside>
       </div>
