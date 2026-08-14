@@ -127,6 +127,41 @@ body {
   font-weight: 700;
 }
 
+.github-star-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: var(--surface-sunken);
+  color: var(--text);
+  border: 1px solid var(--line);
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.github-star-pill:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.star-separator {
+  display: block;
+  width: 1px;
+  height: 12px;
+  background: var(--line);
+}
+
+.star-count {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
 .theme-toggle-button {
   display: grid;
   place-items: center;
