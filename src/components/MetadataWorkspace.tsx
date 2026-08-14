@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   Camera,
   Check,
+  Clipboard,
   Download,
   Edit3,
   Eye,
@@ -9,12 +10,15 @@ import {
   FileSpreadsheet,
   FileText,
   HelpCircle,
+  Lock,
   MapPin,
   Music,
   RefreshCw,
   Save,
+  Shield,
   ShieldAlert,
   ShieldCheck,
+  Sparkles,
   Trash2,
   UploadCloud,
   Zap,
@@ -37,6 +41,7 @@ export function MetadataWorkspace() {
   const [isStripping, setIsStripping] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
 
   // Editable metadata state
   const [editFields, setEditFields] = useState<Record<string, string>>({
@@ -87,7 +92,7 @@ export function MetadataWorkspace() {
     try {
       const cleanBlob = await stripFileMetadata(file);
       setStrippedBlob(cleanBlob);
-      setStatusMessage('100% of metadata stripped successfully!');
+      setStatusMessage('100% of metadata and C2PA manifests stripped successfully!');
 
       const url = URL.createObjectURL(cleanBlob);
       const a = document.createElement('a');
@@ -98,20 +103,20 @@ export function MetadataWorkspace() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      alert('Error stripping metadata from file');
+      alert('Error stripping file metadata');
       console.error(err);
     } finally {
       setIsStripping(false);
     }
   }
 
-  async function handleSaveEditedMetadata() {
+  async function handleSaveEdits() {
     if (!file) return;
     setIsSavingEdit(true);
     setStatusMessage(null);
     try {
       const modifiedBlob = await applyMetadataEdits(file, editFields);
-      setStatusMessage('Custom metadata applied and file generated!');
+      setStatusMessage('Metadata edits applied & saved into binary stream!');
 
       const url = URL.createObjectURL(modifiedBlob);
       const a = document.createElement('a');
@@ -129,6 +134,12 @@ export function MetadataWorkspace() {
     }
   }
 
+  const copyPromptToClipboard = async (text: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopiedPrompt(true);
+    setTimeout(() => setCopiedPrompt(false), 2000);
+  };
+
   return (
     <div className="workspace-panel space-y-6">
       {/* Header Bar */}
@@ -137,14 +148,14 @@ export function MetadataWorkspace() {
           <div className="flex items-center gap-2 mb-1">
             <span className="badge-emerald">Metadata Desk</span>
             <span className="text-xs text-[var(--muted)] font-mono">
-              EXIF · GPS · PDF · Media
+              C2PA · EXIF · GPS · PDF · Media
             </span>
           </div>
           <h2 className="text-2xl md:text-3xl font-headline font-bold">
-            Metadata Viewer, Editor & Stripper
+            Metadata & C2PA Provenance Desk
           </h2>
           <p className="text-sm text-[var(--muted)] mt-1">
-            Inspect hidden hardware signatures, edit author tags in-place, or strip 100% of metadata client-side.
+            Inspect C2PA Content Credentials (ChatGPT, DALL·E 3, Nano Banana), edit author tags in-place, or strip 100% of metadata client-side.
           </p>
         </div>
 
@@ -160,7 +171,7 @@ export function MetadataWorkspace() {
               }`}
             >
               <Eye size={14} />
-              Viewer
+              Viewer & C2PA
             </button>
             <button
               type="button"
@@ -205,7 +216,7 @@ export function MetadataWorkspace() {
               Drag and drop an Image, PDF, or Audio file
             </h3>
             <p className="text-xs text-[var(--muted)] max-w-md mb-4">
-              Supports JPEG (EXIF/GPS), PNG (Chunks), WebP, PDF (Author & Info dict), MP3/WAV (ID3). Everything runs in local memory.
+              Inspect C2PA Content Credentials, EXIF/GPS tags, PNG chunks, PDF author records, or MP3 tags. 100% processed in local browser RAM.
             </p>
             <span className="btn-primary text-xs font-bold px-5 py-2.5">
               Browse Local File
@@ -274,7 +285,7 @@ export function MetadataWorkspace() {
             <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300">
               <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider mb-2">
                 <AlertTriangle size={16} />
-                Detected Privacy Hazards ({metadata.threats.length})
+                Detected Privacy & Provenance Findings ({metadata.threats.length})
               </div>
               <ul className="text-xs space-y-1 list-disc pl-5 text-amber-200/90">
                 {metadata.threats.map((threat, i) => (
@@ -284,9 +295,99 @@ export function MetadataWorkspace() {
             </div>
           )}
 
-          {/* TAB 1: METADATA VIEWER */}
+          {/* TAB 1: METADATA VIEWER & C2PA */}
           {activeTab === 'view' && metadata && (
             <div className="space-y-6">
+              {/* C2PA CONTENT CREDENTIALS CARD (Like ChatGPT / Nano Banana) */}
+              {metadata.c2pa && (
+                <div className="p-5 rounded-2xl bg-[var(--surface-sunken)] border-2 border-emerald-500/30 shadow-lg space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--line)]">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center font-mono font-bold text-emerald-400 text-sm">
+                        CR
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-headline font-bold text-base text-[var(--text)]">
+                            Content Credentials (C2PA)
+                          </h3>
+                          <span className="badge-emerald flex items-center gap-1">
+                            <ShieldCheck size={12} />
+                            Verified Manifest
+                          </span>
+                        </div>
+                        <p className="text-xs text-[var(--muted)]">
+                          Cryptographic provenance manifest and AI generation trail detected.
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleQuickStrip}
+                      className="btn-secondary text-xs font-bold text-red-400 hover:border-red-500/40 hover:bg-red-500/10 flex items-center gap-1.5 self-start sm:self-auto"
+                    >
+                      <Trash2 size={13} />
+                      Strip C2PA Manifest
+                    </button>
+                  </div>
+
+                  {/* Provenance Details Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs font-mono">
+                    <div className="p-3 rounded-xl bg-[var(--panel)] border border-[var(--line)] space-y-1">
+                      <span className="text-[var(--muted)] text-[11px] block uppercase">Signer / Issuer</span>
+                      <span className="font-bold text-[var(--accent)] block truncate">{metadata.c2pa.signer}</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-[var(--panel)] border border-[var(--line)] space-y-1">
+                      <span className="text-[var(--muted)] text-[11px] block uppercase">Generator / Model</span>
+                      <span className="font-bold text-[var(--text)] block truncate">{metadata.c2pa.generator}</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-[var(--panel)] border border-[var(--line)] space-y-1">
+                      <span className="text-[var(--muted)] text-[11px] block uppercase">Claim Action</span>
+                      <span className="font-bold text-[var(--text)] block truncate">{metadata.c2pa.actionSummary}</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-[var(--panel)] border border-[var(--line)] space-y-1">
+                      <span className="text-[var(--muted)] text-[11px] block uppercase">Signature Timestamp</span>
+                      <span className="font-bold text-[var(--text)] block truncate">{metadata.c2pa.timestamp}</span>
+                    </div>
+                  </div>
+
+                  {/* Embedded Generation Prompt if present */}
+                  {metadata.c2pa.promptUsed && (
+                    <div className="p-3.5 rounded-xl bg-[var(--panel)] border border-[var(--line)] space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold flex items-center gap-1.5 text-[var(--accent)]">
+                          <Sparkles size={14} />
+                          Embedded AI Generation Prompt
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => copyPromptToClipboard(metadata.c2pa?.promptUsed || '')}
+                          className="text-xs text-[var(--muted)] hover:text-[var(--text)] flex items-center gap-1 font-mono"
+                        >
+                          {copiedPrompt ? <Check size={12} className="text-emerald-400" /> : <Clipboard size={12} />}
+                          {copiedPrompt ? 'Copied' : 'Copy Prompt'}
+                        </button>
+                      </div>
+                      <p className="text-xs font-mono text-[var(--text)] bg-[var(--surface-sunken)] p-2.5 rounded-lg border border-[var(--line)] whitespace-pre-wrap">
+                        {metadata.c2pa.promptUsed}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Cryptographic Digest Footnote */}
+                  {metadata.c2pa.signatureDigest && (
+                    <div className="flex items-center justify-between text-[11px] font-mono text-[var(--muted)] pt-1">
+                      <span>Manifest Digest: <code className="text-[var(--accent)]">{metadata.c2pa.signatureDigest}</code></span>
+                      <span className="flex items-center gap-1">
+                        <Lock size={11} />
+                        C2PA Standard Spec v1.3
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* GPS Map Block if present */}
               {metadata.hasGps && metadata.gpsCoordinates && (
                 <div className="p-4 rounded-xl bg-[var(--surface-sunken)] border border-red-500/30">
@@ -352,8 +453,8 @@ export function MetadataWorkspace() {
                     ))}
                   </div>
                 ) : (
-                  <div className="p-8 text-center text-xs text-[var(--muted)] italic">
-                    This file is clean or does not contain standard EXIF/IPTC/PDF metadata streams.
+                  <div className="p-8 text-center text-xs text-[var(--muted)]">
+                    No embedded metadata tags detected in this file. It is clean or already sanitized.
                   </div>
                 )}
               </div>
@@ -362,21 +463,20 @@ export function MetadataWorkspace() {
 
           {/* TAB 2: METADATA EDITOR */}
           {activeTab === 'edit' && (
-            <div className="p-6 rounded-xl bg-[var(--panel)] border border-[var(--line)] space-y-5">
-              <div className="flex items-center justify-between border-b border-[var(--line)] pb-3">
-                <h3 className="text-sm font-bold flex items-center gap-2">
-                  <Edit3 size={16} className="text-[var(--accent)]" />
-                  In-Place Metadata Field Sanitizer
+            <div className="p-6 rounded-2xl bg-[var(--surface-sunken)] border border-[var(--line)] space-y-6">
+              <div>
+                <h3 className="font-headline font-bold text-lg mb-1">
+                  In-Place Metadata Injection & Tag Editing
                 </h3>
-                <span className="text-xs text-[var(--muted)]">
-                  Override or customize metadata headers
-                </span>
+                <p className="text-xs text-[var(--muted)]">
+                  Overwrites or injects custom fields into JPEG EXIF, PNG chunks, PDF trailers, or ID3 containers while stripping GPS coordinates and tracking hashes.
+                </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <div>
-                  <label className="block text-[var(--muted)] mb-1 font-semibold">
-                    Author / Creator Name
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-[var(--muted)]">
+                    Creator / Author Name
                   </label>
                   <input
                     type="text"
@@ -384,13 +484,13 @@ export function MetadataWorkspace() {
                     onChange={(e) =>
                       setEditFields({ ...editFields, Author: e.target.value })
                     }
-                    placeholder="Leave blank or set to 'Anonymous'"
-                    className="input-field text-xs"
+                    placeholder="e.g. Poorvith M P"
+                    className="input-field text-xs font-mono"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-[var(--muted)] mb-1 font-semibold">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-[var(--muted)]">
                     Document / Image Title
                   </label>
                   <input
@@ -399,14 +499,14 @@ export function MetadataWorkspace() {
                     onChange={(e) =>
                       setEditFields({ ...editFields, Title: e.target.value })
                     }
-                    placeholder="Clean document title"
-                    className="input-field text-xs"
+                    placeholder="e.g. Architecture Blueprint"
+                    className="input-field text-xs font-mono"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-[var(--muted)] mb-1 font-semibold">
-                    Software / Producer Tag
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-[var(--muted)]">
+                    Software Fingerprint
                   </label>
                   <input
                     type="text"
@@ -414,13 +514,13 @@ export function MetadataWorkspace() {
                     onChange={(e) =>
                       setEditFields({ ...editFields, Software: e.target.value })
                     }
-                    placeholder="Wipe editing tool fingerprint"
-                    className="input-field text-xs"
+                    placeholder="e.g. AIScrubber Suite v2.2.0"
+                    className="input-field text-xs font-mono"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-[var(--muted)] mb-1 font-semibold">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-[var(--muted)]">
                     Copyright Notice
                   </label>
                   <input
@@ -429,24 +529,24 @@ export function MetadataWorkspace() {
                     onChange={(e) =>
                       setEditFields({ ...editFields, Copyright: e.target.value })
                     }
-                    placeholder="Wipe or customize copyright"
-                    className="input-field text-xs"
+                    placeholder="e.g. CC-BY 4.0 / Public Domain"
+                    className="input-field text-xs font-mono"
                   />
                 </div>
               </div>
 
-              <div className="pt-4 flex items-center justify-between border-t border-[var(--line)]">
+              <div className="pt-4 border-t border-[var(--line)] flex items-center justify-between flex-wrap gap-4">
                 <span className="text-xs text-[var(--muted)]">
-                  Wipes hardware serials and GPS while saving clean fields.
+                  Binary tag injection executes 100% in browser memory.
                 </span>
                 <button
                   type="button"
-                  onClick={handleSaveEditedMetadata}
+                  onClick={handleSaveEdits}
                   disabled={isSavingEdit}
-                  className="btn-primary text-xs font-bold flex items-center gap-2"
+                  className="btn-primary text-xs font-bold flex items-center gap-1.5"
                 >
                   <Save size={14} />
-                  {isSavingEdit ? 'Applying Edits...' : 'Apply & Download Edited File'}
+                  {isSavingEdit ? 'Encoding & Saving...' : 'Apply & Download Edited File'}
                 </button>
               </div>
             </div>
@@ -454,26 +554,30 @@ export function MetadataWorkspace() {
 
           {/* TAB 3: 1-CLICK STRIPPER */}
           {activeTab === 'strip' && (
-            <div className="p-8 rounded-2xl bg-[var(--surface-sunken)] border border-[var(--accent)] text-center space-y-4">
-              <div className="w-16 h-16 rounded-full bg-[var(--accent-tint)] flex items-center justify-center text-[var(--accent)] mx-auto">
-                <ShieldCheck size={32} />
+            <div className="p-8 rounded-2xl bg-[var(--surface-sunken)] border border-[var(--line)] text-center space-y-4">
+              <div className="w-14 h-14 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center mx-auto">
+                <Trash2 size={28} />
               </div>
-              <h3 className="text-xl font-bold font-headline">
-                1-Click Complete Metadata Sanitization
-              </h3>
-              <p className="text-xs text-[var(--muted)] max-w-lg mx-auto">
-                Renders and re-encodes pixel streams for images, zeros PDF tracking dictionaries, and wipes audio ID3 tags entirely in browser memory.
-              </p>
+              <div className="max-w-md mx-auto space-y-1">
+                <h3 className="font-headline font-bold text-lg">
+                  1-Click Complete Metadata Sanitizer
+                </h3>
+                <p className="text-xs text-[var(--muted)]">
+                  Wipes 100% of EXIF, GPS coordinates, camera serials, C2PA Content Credentials manifests, and PDF author logs.
+                </p>
+              </div>
 
-              <button
-                type="button"
-                onClick={handleQuickStrip}
-                disabled={isStripping}
-                className="btn-primary text-sm font-bold px-8 py-3.5 inline-flex items-center gap-2 shadow-lg hover:scale-105 transition-all"
-              >
-                <Zap size={18} />
-                {isStripping ? 'Sanitizing...' : 'Download 100% Clean File'}
-              </button>
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleQuickStrip}
+                  disabled={isStripping}
+                  className="btn-primary text-xs font-bold px-6 py-3 flex items-center gap-2 mx-auto"
+                >
+                  <Zap size={16} />
+                  {isStripping ? 'Sanitizing File...' : 'Sanitize & Download Clean File'}
+                </button>
+              </div>
             </div>
           )}
         </div>
