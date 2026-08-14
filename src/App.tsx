@@ -7,10 +7,13 @@ import {
   FileCode2,
   FileSpreadsheet,
   Heart,
+  Home,
   ImageIcon,
   Lock,
   MessageSquarePlus,
   Moon,
+  Scale,
+  Shield,
   ShieldCheck,
   Sparkles,
   Star,
@@ -22,13 +25,23 @@ import { useEffect, useState } from 'react';
 import { AboutWorkspace } from './components/AboutWorkspace';
 import { DocsWorkspace } from './components/DocsWorkspace';
 import { FeedbackModal } from './components/FeedbackModal';
+import { HomeWorkspace } from './components/HomeWorkspace';
+import { LegalWorkspace } from './components/LegalWorkspace';
 import { MediaRedactorWorkspace } from './components/MediaRedactorWorkspace';
 import { MetadataWorkspace } from './components/MetadataWorkspace';
 import { PageLoader } from './components/PageLoader';
 import { PromptEnhancerWorkspace } from './components/PromptEnhancerWorkspace';
 import { ScrubberWorkspace } from './components/ScrubberWorkspace';
 
-export type ToolView = 'scrub' | 'prompt' | 'metadata' | 'media' | 'docs' | 'about';
+export type ToolView =
+  | 'home'
+  | 'scrub'
+  | 'prompt'
+  | 'metadata'
+  | 'media'
+  | 'docs'
+  | 'legal'
+  | 'about';
 
 // Original AIScrubber signature logo rendered with current color tokens
 function OriginalLogo({ className = 'w-7 h-7' }: { className?: string }) {
@@ -84,8 +97,9 @@ function GithubIcon({ className = 'w-4 h-4' }: { className?: string }) {
 }
 
 export function App() {
-  const [light, setLight] = useState(false);
-  const [currentView, setCurrentView] = useState<ToolView>('scrub');
+  // Light mode as default
+  const [light, setLight] = useState(true);
+  const [currentView, setCurrentView] = useState<ToolView>('home');
   const [starCount, setStarCount] = useState<number | null>(null);
   const [isSwitching, setIsSwitching] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
@@ -94,8 +108,14 @@ export function App() {
   useEffect(() => {
     const handleHash = () => {
       const hash = window.location.hash.replace('#', '') as ToolView;
-      if (['scrub', 'prompt', 'metadata', 'media', 'docs', 'about'].includes(hash)) {
+      if (
+        ['home', 'scrub', 'prompt', 'metadata', 'media', 'docs', 'legal', 'about'].includes(
+          hash
+        )
+      ) {
         setCurrentView(hash);
+      } else {
+        setCurrentView('home');
       }
     };
     handleHash();
@@ -134,7 +154,8 @@ export function App() {
     setIsSwitching(true);
     setCurrentView(view);
     window.location.hash = view;
-    setTimeout(() => setIsSwitching(false), 280);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => setIsSwitching(false), 240);
   };
 
   useEffect(() => {
@@ -148,7 +169,7 @@ export function App() {
         <div className="flex items-center gap-6">
           <button
             type="button"
-            onClick={() => switchView('scrub')}
+            onClick={() => switchView('home')}
             className="flex items-center gap-2.5 text-left bg-transparent border-0 cursor-pointer p-0"
             aria-label="AIScrubber home"
           >
@@ -160,6 +181,14 @@ export function App() {
 
           {/* Desktop Navigation Switcher */}
           <nav className="hidden lg:flex items-center gap-1 bg-[var(--surface-sunken)] p-1 rounded-xl border border-[var(--line)]">
+            <button
+              type="button"
+              onClick={() => switchView('home')}
+              className={`nav-pill ${currentView === 'home' ? 'active' : ''}`}
+            >
+              <Home size={14} />
+              Home
+            </button>
             <button
               type="button"
               onClick={() => switchView('scrub')}
@@ -199,6 +228,14 @@ export function App() {
             >
               <BookOpen size={14} />
               Docs
+            </button>
+            <button
+              type="button"
+              onClick={() => switchView('legal')}
+              className={`nav-pill ${currentView === 'legal' ? 'active' : ''}`}
+            >
+              <Scale size={14} />
+              Legal
             </button>
             <button
               type="button"
@@ -257,6 +294,13 @@ export function App() {
       <div className="lg:hidden flex items-center gap-1 overflow-x-auto p-2.5 border-b border-[var(--line)] bg-[var(--surface-sunken)]">
         <button
           type="button"
+          onClick={() => switchView('home')}
+          className={`nav-pill whitespace-nowrap text-xs ${currentView === 'home' ? 'active' : ''}`}
+        >
+          Home
+        </button>
+        <button
+          type="button"
           onClick={() => switchView('scrub')}
           className={`nav-pill whitespace-nowrap text-xs ${currentView === 'scrub' ? 'active' : ''}`}
         >
@@ -292,6 +336,13 @@ export function App() {
         </button>
         <button
           type="button"
+          onClick={() => switchView('legal')}
+          className={`nav-pill whitespace-nowrap text-xs ${currentView === 'legal' ? 'active' : ''}`}
+        >
+          Legal
+        </button>
+        <button
+          type="button"
           onClick={() => switchView('about')}
           className={`nav-pill whitespace-nowrap text-xs ${currentView === 'about' ? 'active' : ''}`}
         >
@@ -300,107 +351,24 @@ export function App() {
       </div>
 
       {/* Main App Container */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 flex-1 w-full space-y-12">
-        {/* Dynamic Hero Section */}
-        {currentView !== 'about' && currentView !== 'docs' && (
-          <section className="text-center max-w-3xl mx-auto space-y-4 pt-4 pb-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--line)] bg-[var(--surface-sunken)] text-xs text-[var(--accent)] font-mono">
-              <ShieldCheck size={14} />
-              <span>100% In-Browser · Zero Telemetry on Sensitive Data</span>
-            </div>
-
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-headline font-bold tracking-tight text-[var(--text)]">
-              Remove private details before you share.
-            </h1>
-
-            <p className="text-sm sm:text-base text-[var(--muted)] leading-relaxed max-w-2xl mx-auto">
-              Sanitize text, redact prompts with reversible constants, strip EXIF metadata, and blur sensitive media in local memory.
-            </p>
-
-            {/* Quick-switch tool chips */}
-            <div className="flex items-center justify-center gap-2 pt-2 flex-wrap">
-              <button
-                type="button"
-                onClick={() => switchView('scrub')}
-                className={`quick-chip ${currentView === 'scrub' ? 'active' : ''}`}
-              >
-                Text Scrubber
-              </button>
-              <button
-                type="button"
-                onClick={() => switchView('prompt')}
-                className={`quick-chip ${currentView === 'prompt' ? 'active' : ''}`}
-              >
-                Prompt Enhancer
-              </button>
-              <button
-                type="button"
-                onClick={() => switchView('metadata')}
-                className={`quick-chip ${currentView === 'metadata' ? 'active' : ''}`}
-              >
-                Metadata Desk
-              </button>
-              <button
-                type="button"
-                onClick={() => switchView('media')}
-                className={`quick-chip ${currentView === 'media' ? 'active' : ''}`}
-              >
-                Visual Redactor
-              </button>
-            </div>
-          </section>
-        )}
-
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex-1 w-full space-y-12">
         {/* Active Tool View with Animated Loader Transition */}
         <section id="workspace" className="transition-all duration-300">
           {isSwitching ? (
-            <PageLoader text={`Loading ${currentView.toUpperCase()} Desk...`} />
+            <PageLoader text={`Opening ${currentView.toUpperCase()} Workspace...`} />
           ) : (
             <>
+              {currentView === 'home' && <HomeWorkspace onSelectTool={switchView} />}
               {currentView === 'scrub' && <ScrubberWorkspace />}
               {currentView === 'prompt' && <PromptEnhancerWorkspace />}
               {currentView === 'metadata' && <MetadataWorkspace />}
               {currentView === 'media' && <MediaRedactorWorkspace />}
               {currentView === 'docs' && <DocsWorkspace />}
+              {currentView === 'legal' && <LegalWorkspace />}
               {currentView === 'about' && <AboutWorkspace />}
             </>
           )}
         </section>
-
-        {/* Threat Model & Philosophy Section */}
-        {currentView !== 'about' && currentView !== 'docs' && (
-          <section className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 rounded-2xl bg-[var(--panel)] border border-[var(--line)]">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 font-bold text-sm text-[var(--text)]">
-                <Lock size={16} className="text-[var(--accent)]" />
-                <span>Zero Server Roundtrips</span>
-              </div>
-              <p className="text-xs text-[var(--muted)] leading-relaxed">
-                Processing runs on your machine's CPU in browser memory. Drafts, photos, and files are never transmitted anywhere.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 font-bold text-sm text-[var(--text)]">
-                <Sparkles size={16} className="text-[var(--accent)]" />
-                <span>Deterministic Pattern Matching</span>
-              </div>
-              <p className="text-xs text-[var(--muted)] leading-relaxed">
-                Rules match regexes and data structures predictably. Always review sanitized results before sharing critical drafts.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 font-bold text-sm text-[var(--text)]">
-                <ShieldCheck size={16} className="text-[var(--accent)]" />
-                <span>Client-Side Guarantees</span>
-              </div>
-              <p className="text-xs text-[var(--muted)] leading-relaxed">
-                Open source and verifiable in DevTools Network tab. Built with React, TypeScript, and Web Workers.
-              </p>
-            </div>
-          </section>
-        )}
       </main>
 
       {/* Global Footer */}
@@ -423,13 +391,13 @@ export function App() {
             </span>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap justify-center sm:justify-end">
             <button
               type="button"
-              onClick={() => setShowFeedback(true)}
-              className="hover:text-[var(--text)] cursor-pointer text-[var(--accent)] font-semibold"
+              onClick={() => switchView('home')}
+              className="hover:text-[var(--text)] cursor-pointer"
             >
-              Feedback
+              Home
             </button>
             <button
               type="button"
@@ -440,10 +408,24 @@ export function App() {
             </button>
             <button
               type="button"
+              onClick={() => switchView('legal')}
+              className="hover:text-[var(--text)] cursor-pointer"
+            >
+              Privacy Policy & Terms
+            </button>
+            <button
+              type="button"
               onClick={() => switchView('about')}
               className="hover:text-[var(--text)] cursor-pointer"
             >
-              About & Philosophy
+              About
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowFeedback(true)}
+              className="hover:text-[var(--text)] cursor-pointer text-[var(--accent)] font-semibold"
+            >
+              Feedback
             </button>
             <a
               href="https://github.com/prvthmpcypher/aiscrubber"
@@ -451,15 +433,7 @@ export function App() {
               rel="noreferrer"
               className="hover:text-[var(--text)]"
             >
-              GitHub Repository
-            </a>
-            <a
-              href="https://poorvithmp.com"
-              target="_blank"
-              rel="noreferrer"
-              className="hover:text-[var(--text)]"
-            >
-              Portfolio
+              GitHub
             </a>
           </div>
         </div>

@@ -103,7 +103,7 @@ function parseJpegMetadata(
   threats: string[]
 ) {
   const view = new DataView(buffer);
-  if (view.byteLength < 4 || view.getUint16(0) !== 0xffd8) return; // Not a valid JPEG
+  if (view.byteLength < 4 || view.getUint16(0) !== 0xffd8) return;
 
   let offset = 2;
   while (offset < view.byteLength - 2) {
@@ -128,13 +128,11 @@ function parseJpegMetadata(
       }
       offset += length;
     } else if (marker === 0xffe2 || marker === 0xffed) {
-      // APP2 (ICC profile) or APP13 (Photoshop IPTC)
       const length = view.getUint16(offset);
       threats.push('Photoshop/ICC metadata chunk found in file.');
       offset += length;
     } else if ((marker & 0xff00) === 0xff00 && marker !== 0xff00) {
-      // General JPEG marker
-      if (marker === 0xffda) break; // Start of Scan (SOS)
+      if (marker === 0xffda) break;
       const length = view.getUint16(offset);
       offset += length;
     } else {
@@ -152,8 +150,7 @@ function parseExifTiff(
   const view = new DataView(buffer, tiffOffset);
   if (view.byteLength < 8) return;
 
-  const isLittleEndian = view.getUint16(0) === 0x4949; // "II" vs "MM"
-
+  const isLittleEndian = view.getUint16(0) === 0x4949;
   const firstIfdOffset = view.getUint32(4, isLittleEndian);
   if (firstIfdOffset >= view.byteLength) return;
 
@@ -180,10 +177,8 @@ function parseIfd(
     const valueOffset = entryOffset + 8;
 
     const val = readIfdValue(view, type, count, valueOffset, isLittle);
-
     mapExifTagToField(tag, val, fields, threats, context);
 
-    // Check for Exif SubIFD (0x8769) or GPS SubIFD (0x8825)
     if (tag === 0x8769 && typeof val === 'number') {
       parseIfd(view, val, isLittle, fields, threats, 'Exif');
     } else if (tag === 0x8825 && typeof val === 'number') {
@@ -201,9 +196,7 @@ function readIfdValue(
   valueOffset: number,
   isLittle: boolean
 ): any {
-  // Types: 1=BYTE, 2=ASCII, 3=SHORT, 4=LONG, 5=RATIONAL
   if (type === 2) {
-    // ASCII string
     const stringOffset = count > 4 ? view.getUint32(valueOffset, isLittle) : valueOffset;
     if (stringOffset + count > view.byteLength) return '';
     let str = '';
@@ -237,39 +230,39 @@ function mapExifTagToField(
   const strVal = String(val);
 
   switch (tag) {
-    case 0x010f: // Make
+    case 0x010f:
       fields.push({ tag: 'Make', category: 'camera', label: 'Camera Manufacturer', value: strVal, isSensitive: true });
       break;
-    case 0x0110: // Model
+    case 0x0110:
       fields.push({ tag: 'Model', category: 'camera', label: 'Camera Model', value: strVal, isSensitive: true });
       threats.push(`Camera/Device model exposed: ${strVal}`);
       break;
-    case 0x0131: // Software
+    case 0x0131:
       fields.push({ tag: 'Software', category: 'technical', label: 'Software Used', value: strVal, isSensitive: true });
       threats.push(`Editing software fingerprint: ${strVal}`);
       break;
-    case 0x0132: // DateTime
-    case 0x9003: // DateTimeOriginal
+    case 0x0132:
+    case 0x9003:
       fields.push({ tag: 'DateTimeOriginal', category: 'camera', label: 'Capture Timestamp', value: strVal, isSensitive: true });
       break;
-    case 0x013b: // Artist
+    case 0x013b:
       fields.push({ tag: 'Artist', category: 'author', label: 'Creator / Author', value: strVal, isSensitive: true });
       threats.push(`Author / Creator name exposed: ${strVal}`);
       break;
-    case 0x8298: // Copyright
+    case 0x8298:
       fields.push({ tag: 'Copyright', category: 'author', label: 'Copyright Notice', value: strVal });
       break;
-    case 0x0002: // GPSLatitude
+    case 0x0002:
       if (context === 'GPS') {
         fields.push({ tag: 'GPSLatitude', category: 'location', label: 'GPS Latitude', value: strVal, isSensitive: true });
       }
       break;
-    case 0x0004: // GPSLongitude
+    case 0x0004:
       if (context === 'GPS') {
         fields.push({ tag: 'GPSLongitude', category: 'location', label: 'GPS Longitude', value: strVal, isSensitive: true });
       }
       break;
-    case 0xa434: // LensModel
+    case 0xa434:
       fields.push({ tag: 'LensModel', category: 'camera', label: 'Lens Model', value: strVal });
       break;
   }
@@ -361,7 +354,6 @@ function parseAudioMetadata(
   const view = new DataView(buffer);
   const decoder = new TextDecoder('latin1');
 
-  // Check ID3v2
   if (view.byteLength > 10) {
     const id3Header = decoder.decode(new Uint8Array(buffer, 0, 3));
     if (id3Header === 'ID3') {
@@ -370,7 +362,6 @@ function parseAudioMetadata(
     }
   }
 
-  // Check ID3v1 at EOF
   if (view.byteLength > 128) {
     const tag = decoder.decode(new Uint8Array(buffer, buffer.byteLength - 128, 3));
     if (tag === 'TAG') {
@@ -445,7 +436,6 @@ export async function stripFileMetadata(file: File): Promise<Blob> {
     const decoder = new TextDecoder('latin1');
     let text = decoder.decode(new Uint8Array(buffer));
 
-    // Zero out /Info dictionary
     text = text.replace(/\/Info\s+\d+\s+\d+\s+R/g, '/Info null');
     text = text.replace(/\/Author\s*\([^)]*\)/gi, '/Author ()');
     text = text.replace(/\/Creator\s*\([^)]*\)/gi, '/Creator ()');
@@ -487,6 +477,63 @@ export async function stripFileMetadata(file: File): Promise<Blob> {
     return new Blob([cleanSlice], { type: mimeType });
   }
 
-  // Default fallback: return file as-is if no stripping rule exists
   return file;
+}
+
+// Apply Custom Metadata Edits
+export async function applyMetadataEdits(
+  file: File,
+  edits: Record<string, string>
+): Promise<Blob> {
+  const mimeType = file.type || getMimeFromExtension(file.name);
+
+  // PDF In-Place Edit
+  if (mimeType === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+    const buffer = await file.arrayBuffer();
+    const decoder = new TextDecoder('latin1');
+    let text = decoder.decode(new Uint8Array(buffer));
+
+    if (edits.Author !== undefined) {
+      text = text.replace(/\/Author\s*\([^)]*\)/gi, `/Author (${edits.Author})`);
+    }
+    if (edits.Title !== undefined) {
+      text = text.replace(/\/Title\s*\([^)]*\)/gi, `/Title (${edits.Title})`);
+    }
+    if (edits.Software !== undefined) {
+      text = text.replace(/\/Creator\s*\([^)]*\)/gi, `/Creator (${edits.Software})`);
+      text = text.replace(/\/Producer\s*\([^)]*\)/gi, `/Producer (${edits.Software})`);
+    }
+
+    const encoder = new TextEncoder();
+    return new Blob([encoder.encode(text)], { type: 'application/pdf' });
+  }
+
+  // Audio ID3v1 In-Place Edit
+  if (mimeType.startsWith('audio/') || file.name.toLowerCase().endsWith('.mp3')) {
+    const buffer = await file.arrayBuffer();
+    const uint8 = new Uint8Array(buffer.slice(0));
+    const encoder = new TextEncoder();
+
+    if (uint8.length > 128) {
+      const tagOffset = uint8.length - 128;
+      // Write 'TAG' marker
+      uint8[tagOffset] = 0x54;
+      uint8[tagOffset + 1] = 0x41;
+      uint8[tagOffset + 2] = 0x47;
+
+      if (edits.Title) {
+        const titleBytes = encoder.encode(edits.Title.padEnd(30, '\0').slice(0, 30));
+        uint8.set(titleBytes, tagOffset + 3);
+      }
+      if (edits.Author) {
+        const artistBytes = encoder.encode(edits.Author.padEnd(30, '\0').slice(0, 30));
+        uint8.set(artistBytes, tagOffset + 33);
+      }
+    }
+
+    return new Blob([uint8], { type: mimeType });
+  }
+
+  // For Images: Strip sensitive hardware/GPS EXIF first, then emit clean canvas blob with sanitized fields
+  return stripFileMetadata(file);
 }

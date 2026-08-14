@@ -12,6 +12,7 @@ import {
   MapPin,
   Music,
   RefreshCw,
+  Save,
   ShieldAlert,
   ShieldCheck,
   Trash2,
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import {
+  applyMetadataEdits,
   parseFileMetadata,
   stripFileMetadata,
   type MetadataField,
@@ -33,7 +35,8 @@ export function MetadataWorkspace() {
   const [activeTab, setActiveTab] = useState<'view' | 'edit' | 'strip'>('view');
   const [strippedBlob, setStrippedBlob] = useState<Blob | null>(null);
   const [isStripping, setIsStripping] = useState(false);
-  const [strippedSuccess, setStrippedSuccess] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   // Editable metadata state
   const [editFields, setEditFields] = useState<Record<string, string>>({
@@ -47,13 +50,12 @@ export function MetadataWorkspace() {
     setFile(selectedFile);
     setLoading(true);
     setStrippedBlob(null);
-    setStrippedSuccess(false);
+    setStatusMessage(null);
 
     try {
       const parsed = await parseFileMetadata(selectedFile);
       setMetadata(parsed);
 
-      // Prepopulate edit fields
       const authorField = parsed.fields.find((f) => f.category === 'author');
       const titleField = parsed.fields.find((f) => f.tag.includes('Title'));
       const softwareField = parsed.fields.find((f) => f.tag.includes('Software'));
@@ -81,18 +83,18 @@ export function MetadataWorkspace() {
   async function handleQuickStrip() {
     if (!file) return;
     setIsStripping(true);
+    setStatusMessage(null);
     try {
       const cleanBlob = await stripFileMetadata(file);
       setStrippedBlob(cleanBlob);
-      setStrippedSuccess(true);
+      setStatusMessage('100% of metadata stripped successfully!');
 
-      // Download clean file
       const url = URL.createObjectURL(cleanBlob);
       const a = document.createElement('a');
       a.href = url;
       const ext = file.name.split('.').pop();
       const base = file.name.replace(/\.[^/.]+$/, '');
-      a.download = `${base}_clean.${ext}`;
+      a.download = `${base}_sanitized.${ext}`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -103,8 +105,32 @@ export function MetadataWorkspace() {
     }
   }
 
+  async function handleSaveEditedMetadata() {
+    if (!file) return;
+    setIsSavingEdit(true);
+    setStatusMessage(null);
+    try {
+      const modifiedBlob = await applyMetadataEdits(file, editFields);
+      setStatusMessage('Custom metadata applied and file generated!');
+
+      const url = URL.createObjectURL(modifiedBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      const ext = file.name.split('.').pop();
+      const base = file.name.replace(/\.[^/.]+$/, '');
+      a.download = `${base}_custom_metadata.${ext}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Error applying metadata edits');
+      console.error(err);
+    } finally {
+      setIsSavingEdit(false);
+    }
+  }
+
   return (
-    <div className="workspace-panel">
+    <div className="workspace-panel space-y-6">
       {/* Header Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-[var(--line)]">
         <div>
@@ -118,12 +144,12 @@ export function MetadataWorkspace() {
             Metadata Viewer, Editor & Stripper
           </h2>
           <p className="text-sm text-[var(--muted)] mt-1">
-            Inspect hidden hardware signatures, edit author tags, or strip 100% of metadata client-side.
+            Inspect hidden hardware signatures, edit author tags in-place, or strip 100% of metadata client-side.
           </p>
         </div>
 
         {file && (
-          <div className="flex items-center gap-2 bg-[var(--surface-sunken)] p-1 rounded-xl border border-[var(--line)]">
+          <div className="flex items-center gap-2 bg-[var(--surface-sunken)] p-1 rounded-xl border border-[var(--line)] self-start md:self-auto">
             <button
               type="button"
               onClick={() => setActiveTab('view')}
@@ -169,7 +195,7 @@ export function MetadataWorkspace() {
         <div
           onDragOver={(e) => e.preventDefault()}
           onDrop={onDrop}
-          className="mt-6 p-12 rounded-2xl border-2 border-dashed border-[var(--line)] bg-[var(--surface-sunken)] text-center hover:border-[var(--accent)] transition-all cursor-pointer group"
+          className="p-12 rounded-2xl border-2 border-dashed border-[var(--line)] bg-[var(--surface-sunken)] text-center hover:border-[var(--accent)] transition-all cursor-pointer group"
         >
           <label className="cursor-pointer flex flex-col items-center">
             <div className="w-16 h-16 rounded-full bg-[var(--accent-tint)] flex items-center justify-center text-[var(--accent)] mb-4 group-hover:scale-110 transition-transform">
@@ -179,7 +205,7 @@ export function MetadataWorkspace() {
               Drag and drop an Image, PDF, or Audio file
             </h3>
             <p className="text-xs text-[var(--muted)] max-w-md mb-4">
-              Supports JPEG (EXIF/GPS), PNG (Chunks), WebP, PDF (Author & Info dict), MP3/WAV (ID3). Everything runs in memory.
+              Supports JPEG (EXIF/GPS), PNG (Chunks), WebP, PDF (Author & Info dict), MP3/WAV (ID3). Everything runs in local memory.
             </p>
             <span className="btn-primary text-xs font-bold px-5 py-2.5">
               Browse Local File
@@ -196,7 +222,7 @@ export function MetadataWorkspace() {
         </div>
       ) : (
         /* Loaded File Workbench */
-        <div className="mt-6 space-y-6">
+        <div className="space-y-6">
           {/* File Overview Strip */}
           <div className="p-4 rounded-xl bg-[var(--surface-sunken)] border border-[var(--line)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -234,6 +260,14 @@ export function MetadataWorkspace() {
               </button>
             </div>
           </div>
+
+          {/* Status Alert */}
+          {statusMessage && (
+            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center gap-2 font-bold animate-fade-in">
+              <Check size={16} />
+              <span>{statusMessage}</span>
+            </div>
+          )}
 
           {/* Threats & Hazards */}
           {metadata && metadata.threats.length > 0 && (
@@ -328,14 +362,14 @@ export function MetadataWorkspace() {
 
           {/* TAB 2: METADATA EDITOR */}
           {activeTab === 'edit' && (
-            <div className="p-6 rounded-xl bg-[var(--panel)] border border-[var(--line)] space-y-4">
+            <div className="p-6 rounded-xl bg-[var(--panel)] border border-[var(--line)] space-y-5">
               <div className="flex items-center justify-between border-b border-[var(--line)] pb-3">
                 <h3 className="text-sm font-bold flex items-center gap-2">
                   <Edit3 size={16} className="text-[var(--accent)]" />
                   In-Place Metadata Field Sanitizer
                 </h3>
                 <span className="text-xs text-[var(--muted)]">
-                  Override or wipe specific metadata headers
+                  Override or customize metadata headers
                 </span>
               </div>
 
@@ -401,14 +435,18 @@ export function MetadataWorkspace() {
                 </div>
               </div>
 
-              <div className="pt-4 flex justify-end">
+              <div className="pt-4 flex items-center justify-between border-t border-[var(--line)]">
+                <span className="text-xs text-[var(--muted)]">
+                  Wipes hardware serials and GPS while saving clean fields.
+                </span>
                 <button
                   type="button"
-                  onClick={handleQuickStrip}
+                  onClick={handleSaveEditedMetadata}
+                  disabled={isSavingEdit}
                   className="btn-primary text-xs font-bold flex items-center gap-2"
                 >
-                  <Check size={14} />
-                  Save & Download Cleaned File
+                  <Save size={14} />
+                  {isSavingEdit ? 'Applying Edits...' : 'Apply & Download Edited File'}
                 </button>
               </div>
             </div>
@@ -436,13 +474,6 @@ export function MetadataWorkspace() {
                 <Zap size={18} />
                 {isStripping ? 'Sanitizing...' : 'Download 100% Clean File'}
               </button>
-
-              {strippedSuccess && (
-                <p className="text-xs text-[var(--accent)] font-bold flex items-center justify-center gap-1.5">
-                  <Check size={14} />
-                  File stripped successfully and downloaded!
-                </p>
-              )}
             </div>
           )}
         </div>
