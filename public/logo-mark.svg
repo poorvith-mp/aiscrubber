@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="logo-title">
+  <title id="logo-title">Poorvith M P</title>
+  <rect data-logo-field="true" x="1" y="1" width="62" height="62" rx="17" fill="#080809" stroke="#C8CBD0" stroke-width="1.5"/>
+  <g data-logo-pm="true" fill="#F4F2ED">
+    <path d="M15 14.5h25.5C49.61 14.5 57 21.89 57 31c0 8.15-5.9 14.95-13.65 16.25V28.6L32 35.5 15 21.2Z"/>
+    <path d="M15 28.75h10.75v17.9L15 53.5Z"/>
+  </g>
+  <path data-logo-aperture="true" d="M28.6 32.25 36.25 36v10.3l-7.65 4.1Z" fill="#C9A227"/>
+</svg>
