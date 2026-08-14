@@ -1,3 +1,6 @@
+import exifr from 'exifr';
+import piexif from 'piexifjs';
+
 export interface MetadataField {
   tag: string;
   category: 'camera' | 'location' | 'document' | 'technical' | 'author' | 'audio';
@@ -42,56 +45,6 @@ function crc32(buf: Uint8Array): number {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-export async function parseFileMetadata(file: File): Promise<ParsedMetadata> {
-  const buffer = await file.arrayBuffer();
-  const fields: MetadataField[] = [];
-  const threats: string[] = [];
-  let hasGps = false;
-  let gpsCoordinates: ParsedMetadata['gpsCoordinates'] | undefined;
-
-  const mimeType = file.type || getMimeFromExtension(file.name);
-
-  if (mimeType.startsWith('image/jpeg') || mimeType.startsWith('image/jpg')) {
-    parseJpegMetadata(buffer, fields, threats);
-  } else if (mimeType.startsWith('image/png')) {
-    parsePngMetadata(buffer, fields, threats);
-  } else if (mimeType === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
-    parsePdfMetadata(buffer, fields, threats);
-  } else if (mimeType.startsWith('audio/') || file.name.toLowerCase().endsWith('.mp3')) {
-    parseAudioMetadata(buffer, fields, threats);
-  } else if (mimeType.startsWith('image/svg')) {
-    parseSvgMetadata(buffer, fields, threats);
-  }
-
-  // Check for GPS in extracted fields
-  const latField = fields.find((f) => f.tag === 'GPSLatitude');
-  const lonField = fields.find((f) => f.tag === 'GPSLongitude');
-  if (latField && lonField) {
-    const lat = parseFloat(latField.value);
-    const lon = parseFloat(lonField.value);
-    if (!isNaN(lat) && !isNaN(lon)) {
-      hasGps = true;
-      gpsCoordinates = {
-        latitude: lat,
-        longitude: lon,
-        mapsUrl: `https://www.google.com/maps?q=${lat},${lon}`,
-      };
-      threats.push('Precise GPS coordinates discovered in EXIF header.');
-    }
-  }
-
-  return {
-    fileName: file.name,
-    fileSize: file.size,
-    fileType: mimeType || 'application/octet-stream',
-    lastModified: new Date(file.lastModified).toLocaleString(),
-    fields,
-    hasGps,
-    gpsCoordinates,
-    threats,
-  };
-}
-
 function getMimeFromExtension(name: string): string {
   const ext = name.split('.').pop()?.toLowerCase();
   switch (ext) {
@@ -117,395 +70,211 @@ function getMimeFromExtension(name: string): string {
   }
 }
 
-// JPEG EXIF & XMP Parser
-function parseJpegMetadata(
-  buffer: ArrayBuffer,
-  fields: MetadataField[],
-  threats: string[]
-) {
-  const view = new DataView(buffer);
-  if (view.byteLength < 4 || view.getUint16(0) !== 0xffd8) return;
+export async function parseFileMetadata(file: File): Promise<ParsedMetadata> {
+  const fields: MetadataField[] = [];
+  const threats: string[] = [];
+  let hasGps = false;
+  let gpsCoordinates: ParsedMetadata['gpsCoordinates'] | undefined;
 
-  let offset = 2;
-  const decoder = new TextDecoder('latin1');
+  const mimeType = file.type || getMimeFromExtension(file.name);
 
-  while (offset < view.byteLength - 2) {
-    const marker = view.getUint16(offset);
-    offset += 2;
+  // 1. IMAGE METADATA (JPEG, PNG, WEBP, TIFF, HEIC, AVIF) via exifr
+  if (
+    mimeType.startsWith('image/') &&
+    mimeType !== 'image/svg+xml' &&
+    !file.name.toLowerCase().endsWith('.svg')
+  ) {
+    try {
+      const rawExif = await exifr.parse(file, {
+        tiff: true,
+        xmp: true,
+        icc: true,
+        iptc: true,
+        jfif: true,
+        mergeOutput: true,
+      });
 
-    if (marker === 0xffe1) {
-      const length = view.getUint16(offset);
-      const app1Offset = offset + 2;
+      if (rawExif) {
+        // Map Standard Fields
+        if (rawExif.Make) {
+          fields.push({ tag: 'Make', category: 'camera', label: 'Camera Manufacturer', value: String(rawExif.Make), isSensitive: true });
+        }
+        if (rawExif.Model) {
+          fields.push({ tag: 'Model', category: 'camera', label: 'Camera Model', value: String(rawExif.Model), isSensitive: true });
+          threats.push(`Camera/Device model exposed: ${rawExif.Model}`);
+        }
+        if (rawExif.Artist || rawExif.creator || rawExif.Author) {
+          const val = String(rawExif.Artist || rawExif.creator || rawExif.Author);
+          fields.push({ tag: 'Artist', category: 'author', label: 'Creator / Author', value: val, isSensitive: true });
+          threats.push(`Author name discovered: ${val}`);
+        }
+        if (rawExif.ImageDescription || rawExif.title || rawExif.Title || rawExif.headline) {
+          const val = String(rawExif.ImageDescription || rawExif.title || rawExif.Title || rawExif.headline);
+          fields.push({ tag: 'Title', category: 'document', label: 'Document / Image Title', value: val });
+        }
+        if (rawExif.Software || rawExif.CreatorTool) {
+          const val = String(rawExif.Software || rawExif.CreatorTool);
+          fields.push({ tag: 'Software', category: 'technical', label: 'Software Used', value: val, isSensitive: true });
+          threats.push(`Editing software fingerprint: ${val}`);
+        }
+        if (rawExif.Copyright || rawExif.rights) {
+          const val = String(rawExif.Copyright || rawExif.rights);
+          fields.push({ tag: 'Copyright', category: 'author', label: 'Copyright Notice', value: val });
+        }
+        if (rawExif.DateTimeOriginal || rawExif.CreateDate || rawExif.ModifyDate) {
+          const val = String(rawExif.DateTimeOriginal || rawExif.CreateDate || rawExif.ModifyDate);
+          fields.push({ tag: 'DateTimeOriginal', category: 'camera', label: 'Capture Timestamp', value: val, isSensitive: true });
+        }
+        if (rawExif.LensModel || rawExif.Lens) {
+          fields.push({ tag: 'LensModel', category: 'camera', label: 'Lens Specification', value: String(rawExif.LensModel || rawExif.Lens) });
+        }
+        if (rawExif.ISO) {
+          fields.push({ tag: 'ISO', category: 'technical', label: 'ISO Sensitivity', value: String(rawExif.ISO) });
+        }
+        if (rawExif.FNumber) {
+          fields.push({ tag: 'FNumber', category: 'technical', label: 'Aperture (F-Stop)', value: `f/${rawExif.FNumber}` });
+        }
+        if (rawExif.ExposureTime) {
+          fields.push({ tag: 'ExposureTime', category: 'technical', label: 'Shutter Speed', value: `1/${Math.round(1 / rawExif.ExposureTime)}s` });
+        }
 
-      // 1. Check for EXIF "Exif\0\0"
-      if (
-        view.getUint8(app1Offset) === 0x45 &&
-        view.getUint8(app1Offset + 1) === 0x78 &&
-        view.getUint8(app1Offset + 2) === 0x69 &&
-        view.getUint8(app1Offset + 3) === 0x66 &&
-        view.getUint8(app1Offset + 4) === 0x00 &&
-        view.getUint8(app1Offset + 5) === 0x00
-      ) {
-        parseExifTiff(buffer, app1Offset + 6, fields, threats);
-      }
-      // 2. Check for XMP "http://ns.adobe.com/xap/1.0/\0"
-      else {
-        const headerStr = decoder.decode(new Uint8Array(buffer, app1Offset, Math.min(30, length)));
-        if (headerStr.startsWith('http://ns.adobe.com/xap/1.0/')) {
-          const xmpData = decoder.decode(new Uint8Array(buffer, app1Offset + 29, length - 29));
-          parseXmpXml(xmpData, fields, threats);
+        // Generic extraction of any other tags in exifr output
+        const knownKeys = new Set([
+          'Make', 'Model', 'Artist', 'creator', 'Author', 'ImageDescription', 'title', 'Title',
+          'headline', 'Software', 'CreatorTool', 'Copyright', 'rights', 'DateTimeOriginal',
+          'CreateDate', 'ModifyDate', 'LensModel', 'Lens', 'ISO', 'FNumber', 'ExposureTime',
+          'latitude', 'longitude', 'GPSLatitude', 'GPSLongitude', 'GPSAltitude',
+        ]);
+
+        for (const [key, val] of Object.entries(rawExif)) {
+          if (!knownKeys.has(key) && typeof val === 'string' && val.trim() && val.length < 200) {
+            fields.push({
+              tag: key,
+              category: 'document',
+              label: key.replace(/([A-Z])/g, ' $1').trim(),
+              value: val.trim(),
+            });
+          }
         }
       }
-      offset += length;
-    } else if (marker === 0xffe2 || marker === 0xffed) {
-      const length = view.getUint16(offset);
-      threats.push('Photoshop/ICC metadata chunk found in file.');
-      offset += length;
-    } else if ((marker & 0xff00) === 0xff00 && marker !== 0xff00) {
-      if (marker === 0xffda) break; // SOS
-      const length = view.getUint16(offset);
-      offset += length;
-    } else {
-      break;
-    }
-  }
-}
 
-function parseXmpXml(xmpText: string, fields: MetadataField[], threats: string[]) {
-  // Title
-  const titleMatch =
-    xmpText.match(/<dc:title>[^<]*<rdf:li[^>]*>([^<]+)<\/rdf:li>/i) ||
-    xmpText.match(/dc:title="([^"]+)"/i) ||
-    xmpText.match(/<dc:title>([^<]+)<\/dc:title>/i);
-  if (titleMatch && !fields.some((f) => f.tag === 'XMP_Title')) {
-    fields.push({
-      tag: 'XMP_Title',
-      category: 'document',
-      label: 'Document / Image Title',
-      value: titleMatch[1].trim(),
-    });
-  }
-
-  // Author / Creator
-  const authorMatch =
-    xmpText.match(/<dc:creator>[^<]*<rdf:li[^>]*>([^<]+)<\/rdf:li>/i) ||
-    xmpText.match(/dc:creator="([^"]+)"/i) ||
-    xmpText.match(/<dc:creator>([^<]+)<\/dc:creator>/i);
-  if (authorMatch && !fields.some((f) => f.tag === 'XMP_Author')) {
-    fields.push({
-      tag: 'XMP_Author',
-      category: 'author',
-      label: 'Creator / Author',
-      value: authorMatch[1].trim(),
-      isSensitive: true,
-    });
-    threats.push(`Author name exposed in XMP: ${authorMatch[1].trim()}`);
-  }
-
-  // Software / CreatorTool
-  const toolMatch =
-    xmpText.match(/<xmp:CreatorTool>([^<]+)<\/xmp:CreatorTool>/i) ||
-    xmpText.match(/xmp:CreatorTool="([^"]+)"/i);
-  if (toolMatch && !fields.some((f) => f.tag === 'XMP_Software')) {
-    fields.push({
-      tag: 'XMP_Software',
-      category: 'technical',
-      label: 'Software Used',
-      value: toolMatch[1].trim(),
-    });
-  }
-
-  // Copyright / Rights
-  const rightsMatch =
-    xmpText.match(/<dc:rights>[^<]*<rdf:li[^>]*>([^<]+)<\/rdf:li>/i) ||
-    xmpText.match(/dc:rights="([^"]+)"/i) ||
-    xmpText.match(/<dc:rights>([^<]+)<\/dc:rights>/i);
-  if (rightsMatch && !fields.some((f) => f.tag === 'XMP_Copyright')) {
-    fields.push({
-      tag: 'XMP_Copyright',
-      category: 'author',
-      label: 'Copyright Notice',
-      value: rightsMatch[1].trim(),
-    });
-  }
-}
-
-function parseExifTiff(
-  buffer: ArrayBuffer,
-  tiffOffset: number,
-  fields: MetadataField[],
-  threats: string[]
-) {
-  const view = new DataView(buffer, tiffOffset);
-  if (view.byteLength < 8) return;
-
-  const isLittleEndian = view.getUint16(0) === 0x4949;
-  const firstIfdOffset = view.getUint32(4, isLittleEndian);
-  if (firstIfdOffset >= view.byteLength) return;
-
-  parseIfd(view, firstIfdOffset, isLittleEndian, fields, threats, '0th');
-}
-
-function parseIfd(
-  view: DataView,
-  offset: number,
-  isLittle: boolean,
-  fields: MetadataField[],
-  threats: string[],
-  context: string
-) {
-  if (offset + 2 > view.byteLength) return;
-  const numEntries = view.getUint16(offset, isLittle);
-  let entryOffset = offset + 2;
-
-  for (let i = 0; i < numEntries; i++) {
-    if (entryOffset + 12 > view.byteLength) break;
-    const tag = view.getUint16(entryOffset, isLittle);
-    const type = view.getUint16(entryOffset + 2, isLittle);
-    const count = view.getUint32(entryOffset + 4, isLittle);
-    const valueOffset = entryOffset + 8;
-
-    const val = readIfdValue(view, type, count, valueOffset, isLittle);
-    mapExifTagToField(tag, val, fields, threats, context);
-
-    if (tag === 0x8769 && typeof val === 'number') {
-      parseIfd(view, val, isLittle, fields, threats, 'Exif');
-    } else if (tag === 0x8825 && typeof val === 'number') {
-      parseIfd(view, val, isLittle, fields, threats, 'GPS');
-    }
-
-    entryOffset += 12;
-  }
-}
-
-function readIfdValue(
-  view: DataView,
-  type: number,
-  count: number,
-  valueOffset: number,
-  isLittle: boolean
-): any {
-  if (type === 2) {
-    const stringOffset = count > 4 ? view.getUint32(valueOffset, isLittle) : valueOffset;
-    if (stringOffset + count > view.byteLength) return '';
-    let str = '';
-    for (let c = 0; c < count - 1; c++) {
-      str += String.fromCharCode(view.getUint8(stringOffset + c));
-    }
-    return str.trim();
-  } else if (type === 3) {
-    return view.getUint16(valueOffset, isLittle);
-  } else if (type === 4) {
-    return view.getUint32(valueOffset, isLittle);
-  } else if (type === 5) {
-    const rationalOffset = view.getUint32(valueOffset, isLittle);
-    if (rationalOffset + 8 <= view.byteLength) {
-      const num = view.getUint32(rationalOffset, isLittle);
-      const den = view.getUint32(rationalOffset + 4, isLittle);
-      return den !== 0 ? num / den : 0;
-    }
-  }
-  return '';
-}
-
-function mapExifTagToField(
-  tag: number,
-  val: any,
-  fields: MetadataField[],
-  threats: string[],
-  context: string
-) {
-  if (val === undefined || val === '' || val === null) return;
-  const strVal = String(val);
-
-  switch (tag) {
-    case 0x010e:
-      fields.push({ tag: 'ImageDescription', category: 'document', label: 'Image Description', value: strVal });
-      break;
-    case 0x010f:
-      fields.push({ tag: 'Make', category: 'camera', label: 'Camera Manufacturer', value: strVal, isSensitive: true });
-      break;
-    case 0x0110:
-      fields.push({ tag: 'Model', category: 'camera', label: 'Camera Model', value: strVal, isSensitive: true });
-      threats.push(`Camera/Device model exposed: ${strVal}`);
-      break;
-    case 0x0131:
-      fields.push({ tag: 'Software', category: 'technical', label: 'Software Used', value: strVal, isSensitive: true });
-      threats.push(`Editing software fingerprint: ${strVal}`);
-      break;
-    case 0x0132:
-    case 0x9003:
-      fields.push({ tag: 'DateTimeOriginal', category: 'camera', label: 'Capture Timestamp', value: strVal, isSensitive: true });
-      break;
-    case 0x013b:
-      fields.push({ tag: 'Artist', category: 'author', label: 'Creator / Author', value: strVal, isSensitive: true });
-      threats.push(`Author / Creator name exposed: ${strVal}`);
-      break;
-    case 0x8298:
-      fields.push({ tag: 'Copyright', category: 'author', label: 'Copyright Notice', value: strVal });
-      break;
-    case 0x0002:
-      if (context === 'GPS') {
-        fields.push({ tag: 'GPSLatitude', category: 'location', label: 'GPS Latitude', value: strVal, isSensitive: true });
+      // Check GPS
+      const gps = await exifr.gps(file);
+      if (gps && typeof gps.latitude === 'number' && typeof gps.longitude === 'number') {
+        hasGps = true;
+        gpsCoordinates = {
+          latitude: gps.latitude,
+          longitude: gps.longitude,
+          mapsUrl: `https://www.google.com/maps?q=${gps.latitude},${gps.longitude}`,
+        };
+        fields.push({ tag: 'GPSLatitude', category: 'location', label: 'GPS Latitude', value: `${gps.latitude.toFixed(6)}°`, isSensitive: true });
+        fields.push({ tag: 'GPSLongitude', category: 'location', label: 'GPS Longitude', value: `${gps.longitude.toFixed(6)}°`, isSensitive: true });
+        threats.push(`Precise GPS coordinates discovered in EXIF header (${gps.latitude.toFixed(4)}, ${gps.longitude.toFixed(4)})`);
       }
-      break;
-    case 0x0004:
-      if (context === 'GPS') {
-        fields.push({ tag: 'GPSLongitude', category: 'location', label: 'GPS Longitude', value: strVal, isSensitive: true });
-      }
-      break;
-    case 0xa434:
-      fields.push({ tag: 'LensModel', category: 'camera', label: 'Lens Model', value: strVal });
-      break;
-  }
-}
-
-// PNG Chunk Parser
-function parsePngMetadata(
-  buffer: ArrayBuffer,
-  fields: MetadataField[],
-  threats: string[]
-) {
-  const view = new DataView(buffer);
-  if (view.byteLength < 8) return;
-
-  let offset = 8;
-  const decoder = new TextDecoder('latin1');
-
-  while (offset < view.byteLength - 8) {
-    const length = view.getUint32(offset);
-    const chunkType = decoder.decode(new Uint8Array(buffer, offset + 4, 4));
-
-    if (chunkType === 'tEXt' || chunkType === 'zTXt' || chunkType === 'iTXt') {
-      const data = new Uint8Array(buffer, offset + 8, length);
-      const textContent = decoder.decode(data);
-      const nullIdx = textContent.indexOf('\0');
-      const keyword = nullIdx !== -1 ? textContent.slice(0, nullIdx) : textContent;
-      const value = nullIdx !== -1 ? textContent.slice(nullIdx + 1).trim() : '';
-
-      let category: MetadataField['category'] = 'document';
-      let label = `PNG ${keyword}`;
-      let tag = `PNG_${keyword}`;
-
-      if (/author|artist|creator/i.test(keyword)) {
-        category = 'author';
-        label = 'Creator / Author';
-        tag = 'PNG_Author';
-      } else if (/title/i.test(keyword)) {
-        category = 'document';
-        label = 'Document / Image Title';
-        tag = 'PNG_Title';
-      } else if (/software|tool/i.test(keyword)) {
-        category = 'technical';
-        label = 'Software Used';
-        tag = 'PNG_Software';
-      } else if (/copyright|rights/i.test(keyword)) {
-        category = 'author';
-        label = 'Copyright Notice';
-        tag = 'PNG_Copyright';
-      }
-
-      fields.push({
-        tag,
-        category,
-        label,
-        value: value || 'Embedded chunk',
-        isSensitive: category === 'author',
-      });
-      if (category === 'author' && value) {
-        threats.push(`Author name exposed in PNG chunk: ${value}`);
-      }
-    } else if (chunkType === 'eXIf') {
-      threats.push('PNG embedded EXIF profile detected.');
-      fields.push({
-        tag: 'PNG_EXIF',
-        category: 'camera',
-        label: 'PNG Embedded EXIF',
-        value: 'Contains full EXIF data',
-        isSensitive: true,
-      });
-    }
-
-    offset += 12 + length;
-  }
-}
-
-// PDF Parser
-function parsePdfMetadata(
-  buffer: ArrayBuffer,
-  fields: MetadataField[],
-  threats: string[]
-) {
-  const decoder = new TextDecoder('latin1');
-  const text = decoder.decode(new Uint8Array(buffer));
-
-  const infoMatch = text.match(/\/Title\s*\(([^)]+)\)/i);
-  if (infoMatch) fields.push({ tag: 'PDF_Title', category: 'document', label: 'Document Title', value: infoMatch[1].trim() });
-
-  const authorMatch = text.match(/\/Author\s*\(([^)]+)\)/i);
-  if (authorMatch) {
-    fields.push({ tag: 'PDF_Author', category: 'author', label: 'Creator / Author', value: authorMatch[1].trim(), isSensitive: true });
-    threats.push(`PDF author metadata found: ${authorMatch[1].trim()}`);
-  }
-
-  const creatorMatch = text.match(/\/Creator\s*\(([^)]+)\)/i);
-  if (creatorMatch) {
-    fields.push({ tag: 'PDF_Creator', category: 'technical', label: 'Software Creator', value: creatorMatch[1].trim() });
-  }
-
-  const producerMatch = text.match(/\/Producer\s*\(([^)]+)\)/i);
-  if (producerMatch) {
-    fields.push({ tag: 'PDF_Producer', category: 'technical', label: 'PDF Producer Engine', value: producerMatch[1].trim() });
-  }
-
-  const dateMatch = text.match(/\/CreationDate\s*\(([^)]+)\)/i);
-  if (dateMatch) fields.push({ tag: 'PDF_CreationDate', category: 'document', label: 'Creation Date', value: dateMatch[1].trim() });
-}
-
-// Audio ID3 Parser
-function parseAudioMetadata(
-  buffer: ArrayBuffer,
-  fields: MetadataField[],
-  threats: string[]
-) {
-  const view = new DataView(buffer);
-  const decoder = new TextDecoder('latin1');
-
-  if (view.byteLength > 10) {
-    const id3Header = decoder.decode(new Uint8Array(buffer, 0, 3));
-    if (id3Header === 'ID3') {
-      fields.push({ tag: 'Audio_ID3v2', category: 'audio', label: 'ID3v2 Tag Container', value: 'Present', isSensitive: true });
-      threats.push('Audio contains ID3 metadata headers.');
+    } catch (err) {
+      console.warn('exifr parse error fallback:', err);
     }
   }
 
-  if (view.byteLength > 128) {
-    const tag = decoder.decode(new Uint8Array(buffer, buffer.byteLength - 128, 3));
-    if (tag === 'TAG') {
-      const title = decoder.decode(new Uint8Array(buffer, buffer.byteLength - 125, 30)).replace(/\0/g, '').trim();
-      const artist = decoder.decode(new Uint8Array(buffer, buffer.byteLength - 95, 30)).replace(/\0/g, '').trim();
-      if (title) fields.push({ tag: 'Audio_Title', category: 'audio', label: 'Track Title', value: title });
-      if (artist) {
-        fields.push({ tag: 'Audio_Artist', category: 'author', label: 'Track Artist', value: artist, isSensitive: true });
-        threats.push(`Audio artist name: ${artist}`);
+  // 2. PDF PARSER
+  if (mimeType === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+    const buffer = await file.arrayBuffer();
+    const decoder = new TextDecoder('latin1');
+    const text = decoder.decode(new Uint8Array(buffer));
+
+    const infoMatch = text.match(/\/Title\s*\(([^)]+)\)/i);
+    if (infoMatch) fields.push({ tag: 'PDF_Title', category: 'document', label: 'Document Title', value: infoMatch[1].trim() });
+
+    const authorMatch = text.match(/\/Author\s*\(([^)]+)\)/i);
+    if (authorMatch) {
+      fields.push({ tag: 'PDF_Author', category: 'author', label: 'Creator / Author', value: authorMatch[1].trim(), isSensitive: true });
+      threats.push(`PDF author metadata found: ${authorMatch[1].trim()}`);
+    }
+
+    const creatorMatch = text.match(/\/Creator\s*\(([^)]+)\)/i);
+    if (creatorMatch) {
+      fields.push({ tag: 'PDF_Creator', category: 'technical', label: 'Software Creator', value: creatorMatch[1].trim() });
+    }
+
+    const producerMatch = text.match(/\/Producer\s*\(([^)]+)\)/i);
+    if (producerMatch) {
+      fields.push({ tag: 'PDF_Producer', category: 'technical', label: 'PDF Producer Engine', value: producerMatch[1].trim() });
+    }
+
+    const dateMatch = text.match(/\/CreationDate\s*\(([^)]+)\)/i);
+    if (dateMatch) fields.push({ tag: 'PDF_CreationDate', category: 'document', label: 'Creation Date', value: dateMatch[1].trim() });
+  }
+
+  // 3. AUDIO ID3 PARSER
+  if (mimeType.startsWith('audio/') || file.name.toLowerCase().endsWith('.mp3')) {
+    const buffer = await file.arrayBuffer();
+    const decoder = new TextDecoder('latin1');
+
+    if (buffer.byteLength > 10) {
+      const id3Header = decoder.decode(new Uint8Array(buffer, 0, 3));
+      if (id3Header === 'ID3') {
+        fields.push({ tag: 'Audio_ID3v2', category: 'audio', label: 'ID3v2 Tag Container', value: 'Present', isSensitive: true });
+        threats.push('Audio contains ID3 metadata headers.');
+      }
+    }
+
+    if (buffer.byteLength > 128) {
+      const tag = decoder.decode(new Uint8Array(buffer, buffer.byteLength - 128, 3));
+      if (tag === 'TAG') {
+        const title = decoder.decode(new Uint8Array(buffer, buffer.byteLength - 125, 30)).replace(/\0/g, '').trim();
+        const artist = decoder.decode(new Uint8Array(buffer, buffer.byteLength - 95, 30)).replace(/\0/g, '').trim();
+        if (title) fields.push({ tag: 'Audio_Title', category: 'audio', label: 'Track Title', value: title });
+        if (artist) {
+          fields.push({ tag: 'Audio_Artist', category: 'author', label: 'Track Artist', value: artist, isSensitive: true });
+          threats.push(`Audio artist name: ${artist}`);
+        }
       }
     }
   }
+
+  // 4. SVG METADATA PARSER
+  if (mimeType.startsWith('image/svg')) {
+    const buffer = await file.arrayBuffer();
+    const decoder = new TextDecoder('utf-8');
+    const text = decoder.decode(new Uint8Array(buffer));
+    if (text.includes('<metadata>') || text.includes('<rdf:RDF>')) {
+      fields.push({ tag: 'SVG_Metadata', category: 'document', label: 'SVG Metadata Block', value: 'Embedded RDF / Dublin Core', isSensitive: true });
+      threats.push('SVG contains embedded XML/RDF metadata.');
+    }
+  }
+
+  return {
+    fileName: file.name,
+    fileSize: file.size,
+    fileType: mimeType || 'application/octet-stream',
+    lastModified: new Date(file.lastModified).toLocaleString(),
+    fields,
+    hasGps,
+    gpsCoordinates,
+    threats,
+  };
 }
 
-// SVG Metadata Parser
-function parseSvgMetadata(
-  buffer: ArrayBuffer,
-  fields: MetadataField[],
-  threats: string[]
-) {
-  const decoder = new TextDecoder('utf-8');
-  const text = decoder.decode(new Uint8Array(buffer));
+// Helper to convert Blob to DataURL
+function fileToDataUrl(fileOrBlob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(fileOrBlob);
+  });
+}
 
-  if (text.includes('<metadata>') || text.includes('<rdf:RDF>')) {
-    fields.push({ tag: 'SVG_Metadata', category: 'document', label: 'SVG Metadata Block', value: 'Embedded RDF / Dublin Core', isSensitive: true });
-    threats.push('SVG contains embedded XML/RDF metadata.');
+// Helper to convert DataURL to Blob
+function dataUrlToBlob(dataUrl: string): Blob {
+  const parts = dataUrl.split(',');
+  const mime = parts[0].match(/:(.*?);/)?.[1] || 'application/octet-stream';
+  const binary = atob(parts[1]);
+  const array = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    array[i] = binary.charCodeAt(i);
   }
+  return new Blob([array], { type: mime });
 }
 
 // Helper to create PNG tEXt chunk
@@ -538,45 +307,6 @@ function createPngTextChunk(keyword: string, value: string): Uint8Array {
   view.setUint32(8 + dataLen, crcVal, false);
 
   return chunk;
-}
-
-// Helper to create JPEG XMP APP1 chunk
-function createJpegXmpApp1(edits: Record<string, string>): Uint8Array {
-  const enc = new TextEncoder();
-  const author = edits.Author || '';
-  const title = edits.Title || '';
-  const software = edits.Software || 'AIScrubber';
-  const copyright = edits.Copyright || '';
-
-  const xmpXml = `<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
-<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="AIScrubber">
- <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
-  <rdf:Description rdf:about=""
-    xmlns:dc="http://purl.org/dc/elements/1.1/"
-    xmlns:xmp="http://ns.adobe.com/xap/1.0/">
-   ${title ? `<dc:title><rdf:Alt><rdf:li xml:lang="x-default">${title}</rdf:li></rdf:Alt></dc:title>` : ''}
-   ${author ? `<dc:creator><rdf:Seq><rdf:li>${author}</rdf:li></rdf:Seq></dc:creator>` : ''}
-   ${copyright ? `<dc:rights><rdf:Alt><rdf:li xml:lang="x-default">${copyright}</rdf:li></rdf:Alt></dc:rights>` : ''}
-   ${software ? `<xmp:CreatorTool>${software}</xmp:CreatorTool>` : ''}
-  </rdf:Description>
- </rdf:RDF>
-</x:xmpmeta>
-<?xpacket end="w"?>`;
-
-  const namespace = 'http://ns.adobe.com/xap/1.0/\0';
-  const headerBytes = enc.encode(namespace);
-  const xmlBytes = enc.encode(xmpXml);
-  const payloadLen = headerBytes.length + xmlBytes.length;
-  const markerLen = 2 + payloadLen;
-
-  const app1 = new Uint8Array(2 + markerLen);
-  const view = new DataView(app1.buffer);
-  view.setUint16(0, 0xffe1, false);
-  view.setUint16(2, markerLen, false);
-  app1.set(headerBytes, 4);
-  app1.set(xmlBytes, 4 + headerBytes.length);
-
-  return app1;
 }
 
 // 1-Click Stripper: Removes 100% of metadata client-side
@@ -675,7 +405,37 @@ export async function applyMetadataEdits(
 ): Promise<Blob> {
   const mimeType = file.type || getMimeFromExtension(file.name);
 
-  // 1. PNG IN-PLACE CHUNK INJECTION
+  // 1. JPEG EXIF INJECTION (piexifjs)
+  if (mimeType === 'image/jpeg' || mimeType === 'image/jpg') {
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      let exifObj: any;
+      try {
+        exifObj = piexif.load(dataUrl);
+      } catch {
+        exifObj = { '0th': {}, Exif: {}, GPS: {}, '1st': {}, Interop: {} };
+      }
+
+      if (!exifObj['0th']) exifObj['0th'] = {};
+      if (!exifObj.Exif) exifObj.Exif = {};
+
+      if (edits.Author) exifObj['0th'][piexif.ImageIFD.Artist] = edits.Author;
+      if (edits.Title) exifObj['0th'][piexif.ImageIFD.ImageDescription] = edits.Title;
+      if (edits.Software) exifObj['0th'][piexif.ImageIFD.Software] = edits.Software;
+      if (edits.Copyright) exifObj['0th'][piexif.ImageIFD.Copyright] = edits.Copyright;
+
+      // Clear GPS dictionary for privacy
+      exifObj.GPS = {};
+
+      const exifBytes = piexif.dump(exifObj);
+      const newJpegDataUrl = piexif.insert(exifBytes, dataUrl);
+      return dataUrlToBlob(newJpegDataUrl);
+    } catch (err) {
+      console.error('Failed to inject JPEG EXIF with piexifjs:', err);
+    }
+  }
+
+  // 2. PNG IN-PLACE CHUNK INJECTION
   if (mimeType === 'image/png') {
     const buffer = await file.arrayBuffer();
     const view = new DataView(buffer);
@@ -689,12 +449,12 @@ export async function applyMetadataEdits(
         const chunkType = decoder.decode(new Uint8Array(buffer, offset + 4, 4));
         const totalChunkSize = 12 + length;
 
-        // Keep all chunks except old textual/exif chunks
+        // Filter out old textual/exif chunks
         if (!['tEXt', 'zTXt', 'iTXt', 'eXIf'].includes(chunkType)) {
           filteredChunks.push(new Uint8Array(buffer, offset, totalChunkSize));
         }
 
-        // If after IHDR chunk, inject our new custom tEXt chunks!
+        // Insert new custom tEXt chunks right after IHDR
         if (chunkType === 'IHDR') {
           if (edits.Author) filteredChunks.push(createPngTextChunk('Author', edits.Author));
           if (edits.Title) filteredChunks.push(createPngTextChunk('Title', edits.Title));
@@ -709,44 +469,6 @@ export async function applyMetadataEdits(
     }
   }
 
-  // 2. JPEG IN-PLACE XMP APP1 INJECTION
-  if (mimeType === 'image/jpeg' || mimeType === 'image/jpg') {
-    const buffer = await file.arrayBuffer();
-    const view = new DataView(buffer);
-    if (view.byteLength > 4 && view.getUint16(0) === 0xffd8) {
-      const cleanSegments: Uint8Array[] = [new Uint8Array([0xff, 0xd8])]; // SOI marker
-
-      // Inject our new clean XMP APP1 marker!
-      const newXmpApp1 = createJpegXmpApp1(edits);
-      cleanSegments.push(newXmpApp1);
-
-      let offset = 2;
-      while (offset < view.byteLength - 2) {
-        const marker = view.getUint16(offset);
-        offset += 2;
-
-        if ((marker & 0xff00) === 0xff00 && marker !== 0xff00) {
-          if (marker === 0xffda) {
-            // SOS: rest of image stream
-            cleanSegments.push(new Uint8Array(buffer, offset - 2));
-            break;
-          }
-
-          const length = view.getUint16(offset);
-          // Omit old APP1 (EXIF/GPS/XMP) and APP2/APP13 chunks so we don't leak old data
-          if (marker !== 0xffe1 && marker !== 0xffe2 && marker !== 0xffed) {
-            cleanSegments.push(new Uint8Array(buffer, offset - 2, 2 + length));
-          }
-          offset += length;
-        } else {
-          break;
-        }
-      }
-
-      return new Blob(cleanSegments as BlobPart[], { type: 'image/jpeg' });
-    }
-  }
-
   // 3. PDF IN-PLACE METADATA INJECTION
   if (mimeType === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
     const buffer = await file.arrayBuffer();
@@ -758,7 +480,7 @@ export async function applyMetadataEdits(
     const softwareStr = edits.Software || 'AIScrubber';
     const copyStr = edits.Copyright || '';
 
-    // Check if /Info dictionary exists
+    // If /Info dictionary exists, replace tags
     if (text.includes('/Info')) {
       if (text.match(/\/Author\s*\([^)]*\)/i)) {
         text = text.replace(/\/Author\s*\([^)]*\)/gi, `/Author (${authorStr})`);
@@ -771,9 +493,12 @@ export async function applyMetadataEdits(
       }
     }
 
-    // Append standard XMP or info dictionary before trailer
+    // Append info dictionary before trailer if missing
     if (!text.includes(`/Author (${authorStr})`) && authorStr) {
-      text = text.replace(/trailer\s*<<\s*/i, `trailer << /Info << /Author (${authorStr}) /Title (${titleStr}) /Creator (${softwareStr}) /Copyright (${copyStr}) >> `);
+      text = text.replace(
+        /trailer\s*<<\s*/i,
+        `trailer << /Info << /Author (${authorStr}) /Title (${titleStr}) /Creator (${softwareStr}) /Copyright (${copyStr}) >> `
+      );
     }
 
     const encoder = new TextEncoder();
@@ -783,7 +508,6 @@ export async function applyMetadataEdits(
   // 4. AUDIO (MP3/WAV) ID3v1 INJECTION
   if (mimeType.startsWith('audio/') || file.name.toLowerCase().endsWith('.mp3')) {
     const buffer = await file.arrayBuffer();
-    // Base slice without old 128-byte tag if present
     const baseLength =
       buffer.byteLength > 128 &&
       new TextDecoder('latin1').decode(new Uint8Array(buffer, buffer.byteLength - 128, 3)) === 'TAG'
