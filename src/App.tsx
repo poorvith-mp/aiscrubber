@@ -6,8 +6,10 @@ import {
   ExternalLink,
   FileCode2,
   FileSpreadsheet,
+  Heart,
   ImageIcon,
   Lock,
+  MessageSquarePlus,
   Moon,
   ShieldCheck,
   Sparkles,
@@ -19,8 +21,10 @@ import {
 import { useEffect, useState } from 'react';
 import { AboutWorkspace } from './components/AboutWorkspace';
 import { DocsWorkspace } from './components/DocsWorkspace';
+import { FeedbackModal } from './components/FeedbackModal';
 import { MediaRedactorWorkspace } from './components/MediaRedactorWorkspace';
 import { MetadataWorkspace } from './components/MetadataWorkspace';
+import { PageLoader } from './components/PageLoader';
 import { PromptEnhancerWorkspace } from './components/PromptEnhancerWorkspace';
 import { ScrubberWorkspace } from './components/ScrubberWorkspace';
 
@@ -83,6 +87,8 @@ export function App() {
   const [light, setLight] = useState(false);
   const [currentView, setCurrentView] = useState<ToolView>('scrub');
   const [starCount, setStarCount] = useState<number | null>(null);
+  const [isSwitching, setIsSwitching] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   // Sync with URL hash
   useEffect(() => {
@@ -124,8 +130,11 @@ export function App() {
   }, []);
 
   const switchView = (view: ToolView) => {
+    if (view === currentView) return;
+    setIsSwitching(true);
     setCurrentView(view);
     window.location.hash = view;
+    setTimeout(() => setIsSwitching(false), 280);
   };
 
   useEffect(() => {
@@ -203,7 +212,18 @@ export function App() {
         </div>
 
         {/* Right Navigation Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
+          {/* Feedback Button */}
+          <button
+            type="button"
+            onClick={() => setShowFeedback(true)}
+            className="btn-secondary text-xs flex items-center gap-1.5"
+            title="Give feedback to founder"
+          >
+            <MessageSquarePlus size={14} className="text-[var(--accent)]" />
+            <span className="hidden sm:inline">Feedback</span>
+          </button>
+
           {/* GitHub Star Live Count Badge */}
           <a
             href="https://github.com/prvthmpcypher/aiscrubber"
@@ -213,8 +233,8 @@ export function App() {
             title="Star AIScrubber on GitHub"
           >
             <GithubIcon className="w-4 h-4" />
-            <span>Star</span>
-            <span className="star-separator" />
+            <span className="hidden sm:inline">Star</span>
+            <span className="star-separator hidden sm:inline" />
             <Star size={12} className="fill-[var(--accent)] text-[var(--accent)]" />
             <span className="star-count font-mono font-bold">
               {starCount !== null ? starCount.toLocaleString() : '★'}
@@ -331,14 +351,20 @@ export function App() {
           </section>
         )}
 
-        {/* Active Tool View */}
+        {/* Active Tool View with Animated Loader Transition */}
         <section id="workspace" className="transition-all duration-300">
-          {currentView === 'scrub' && <ScrubberWorkspace />}
-          {currentView === 'prompt' && <PromptEnhancerWorkspace />}
-          {currentView === 'metadata' && <MetadataWorkspace />}
-          {currentView === 'media' && <MediaRedactorWorkspace />}
-          {currentView === 'docs' && <DocsWorkspace />}
-          {currentView === 'about' && <AboutWorkspace />}
+          {isSwitching ? (
+            <PageLoader text={`Loading ${currentView.toUpperCase()} Desk...`} />
+          ) : (
+            <>
+              {currentView === 'scrub' && <ScrubberWorkspace />}
+              {currentView === 'prompt' && <PromptEnhancerWorkspace />}
+              {currentView === 'metadata' && <MetadataWorkspace />}
+              {currentView === 'media' && <MediaRedactorWorkspace />}
+              {currentView === 'docs' && <DocsWorkspace />}
+              {currentView === 'about' && <AboutWorkspace />}
+            </>
+          )}
         </section>
 
         {/* Threat Model & Philosophy Section */}
@@ -400,6 +426,13 @@ export function App() {
           <div className="flex items-center gap-4">
             <button
               type="button"
+              onClick={() => setShowFeedback(true)}
+              className="hover:text-[var(--text)] cursor-pointer text-[var(--accent)] font-semibold"
+            >
+              Feedback
+            </button>
+            <button
+              type="button"
               onClick={() => switchView('docs')}
               className="hover:text-[var(--text)] cursor-pointer"
             >
@@ -431,6 +464,12 @@ export function App() {
           </div>
         </div>
       </footer>
+
+      {/* Feedback Modal */}
+      <FeedbackModal
+        isOpen={showFeedback}
+        onClose={() => setShowFeedback(false)}
+      />
 
       <Analytics />
     </div>
