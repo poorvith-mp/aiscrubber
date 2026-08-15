@@ -51,22 +51,47 @@ const HOMOGLYPH_MAP = {
   '–': '-', '—': '-', '‘': "'", '’': "'", '“': '"', '”': '"',
 };
 
+const AI_CADENCE_REPLACEMENTS = [
+  [/\bdelve(?:s)? into\b/gi, 'explore'],
+  [/\bdelving into\b/gi, 'exploring'],
+  [/\ba testament to\b/gi, 'proof of'],
+  [/\brich tapestry of\b/gi, 'diverse mix of'],
+  [/\bplays a crucial role\b/gi, 'is essential'],
+  [/\bcrucial role\b/gi, 'key role'],
+  [/\bbeacon of\b/gi, 'guide for'],
+  [/\bnavigating the landscape of\b/gi, 'managing'],
+  [/\bit is important to (?:note|remember) that\b/gi, 'note that'],
+  [/\bunderscores the importance of\b/gi, 'highlights'],
+  [/\bin today's fast-paced digital world\b/gi, 'today'],
+  [/\bseamlessly integrates\b/gi, 'integrates'],
+];
+
 function cleanWatermarkContent(text) {
   let cleaned = text;
   let zeroWidthCount = 0;
+  let tagPlaneCount = 0;
   let spacesCount = 0;
   let homoglyphsCount = 0;
+  let cadenceCount = 0;
 
   // Zero-width & invisible Unicode
-  const zwRegex = /[\u200B\u200C\u200D\uFEFF\u2060\u180E\u00AD\u034F\u061C\u17B4\u17B5\u200E\u200F\u202A-\u202E\u2066-\u2069]/g;
+  const zwRegex = /[\u200B\u200C\u200D\uFEFF\u2060\u180E\u00AD\u034F\u061C\u17B4\u17B5\u200E\u200F\u202A-\u202E\u2066-\u2069\uFE00-\uFE0F]|\\u(?:200[b-fB-F]|feff|FEFF|206[0-9]|180[eE]|00[aA][dD]|034[fF]|202[a-eA-E])/g;
   const zwMatches = cleaned.match(zwRegex);
   if (zwMatches) {
     zeroWidthCount = zwMatches.length;
     cleaned = cleaned.replace(zwRegex, '');
   }
 
+  // Tag plane tokens
+  const tagPlaneRegex = /\uDB40[\uDC00-\uDC7F]/g;
+  const tagMatches = cleaned.match(tagPlaneRegex);
+  if (tagMatches) {
+    tagPlaneCount = tagMatches.length;
+    cleaned = cleaned.replace(tagPlaneRegex, '');
+  }
+
   // Non-standard spaces
-  const spaceRegex = /[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g;
+  const spaceRegex = /[\u00A0\u2000-\u200A\u202F\u205F\u3000]|\\u(?:00[aA]0|200[0-9aA]|202[fF]|205[fF]|3000)/g;
   const spMatches = cleaned.match(spaceRegex);
   if (spMatches) {
     spacesCount = spMatches.length;
@@ -82,12 +107,22 @@ function cleanWatermarkContent(text) {
     return m;
   });
 
+  // AI Cadence
+  for (const [regex, rep] of AI_CADENCE_REPLACEMENTS) {
+    const cm = cleaned.match(regex);
+    if (cm) {
+      cadenceCount += cm.length;
+      cleaned = cleaned.replace(regex, rep);
+    }
+  }
+
   return {
     cleaned_text: cleaned,
-    zero_width_stripped: zeroWidthCount,
+    zero_width_stripped: zeroWidthCount + tagPlaneCount,
     spaces_normalized: spacesCount,
     homoglyphs_reverted: homoglyphsCount,
-    total_anomalies_cleaned: zeroWidthCount + spacesCount + homoglyphsCount,
+    ai_cliches_disrupted: cadenceCount,
+    total_anomalies_cleaned: zeroWidthCount + tagPlaneCount + spacesCount + homoglyphsCount + cadenceCount,
   };
 }
 
@@ -174,7 +209,7 @@ function unmaskContent(aiResponse, sessionKey) {
 const TOOLS = [
   {
     name: 'clean_ai_watermarks',
-    description: 'Strip invisible Unicode zero-width watermarks (Anthropic Claude / ChatGPT markers), normalize non-standard spaces, and revert homoglyphs.',
+    description: 'Strip invisible Unicode zero-width watermarks, Tag-Plane surrogate characters, normalize non-standard spaces, revert homoglyphs, and disrupt AI cadence clichés.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -334,7 +369,6 @@ function handleMessage(msg) {
   };
 }
 
-// Readline JSON-RPC loop over stdio
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,

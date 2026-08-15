@@ -145,37 +145,83 @@ When user CUST-44912 (email: billing@partner.org) charges over $500, trigger web
         categoryLabel: 'Core Features',
         title: 'AI Text & Claude Watermark Remover',
         description:
-          'Detect and strip invisible zero-width tokens, synthetic spacing patterns, homoglyphs, and AI provenance markers from Claude & LLM outputs.',
+          'Deep technical overview: Invisible Unicode zero-width tokens, Unicode Tag Plane steganography, non-standard spaces, and AI stylometric cadence disruption.',
         headings: [
           { id: 'watermark-overview', title: 'Why AI Watermarks Exist' },
-          { id: 'unicode-detectors', title: 'Invisible Unicode Categories' },
-          { id: 'cleaning-profiles', title: 'Cleaning Profiles' },
+          { id: 'unicode-detectors', title: 'Multi-Plane Invisible Unicode' },
+          { id: 'stylometric-disruption', title: 'AI Cadence & Stylometric Disruption' },
+          { id: 'cleaning-profiles', title: 'Cleaning Profiles & Presets' },
         ],
         content: (
           <div className="space-y-6 text-sm text-[var(--muted)] leading-relaxed">
             <p id="watermark-overview">
-              Leading AI providers embed machine-readable invisible watermarks into generated text. These markers use zero-width Unicode characters, specific whitespace sequences, or statistical token biases to identify AI-generated content.
+              Leading frontier AI models (including Anthropic Claude 3.5, ChatGPT, and Google Gemini) employ invisible watermarks and statistical token distribution biases to embed cryptographic or machine-detectable provenance signals into generated text.
             </p>
 
+            <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 space-y-1">
+              <strong className="block text-sm font-bold flex items-center gap-1.5">
+                <Sparkles size={16} />
+                Multi-Layer Watermarking Anatomy
+              </strong>
+              <p className="text-xs text-blue-200/90">
+                AIScrubber sanitizes both <strong>deterministic invisible Unicode markers</strong> (zero-width characters, variation selectors, tag-plane tokens) and <strong>statistical stylometric anomalies</strong> (Green-list n-gram clichés and artificial punctuation spacing).
+              </p>
+            </div>
+
             <h4 id="unicode-detectors" className="text-base font-bold text-[var(--text)] pt-2">
-              Detected Invisible Entities
+              Detected Invisible Entities & Unicode Planes
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div className="p-3 rounded-lg bg-[var(--surface-sunken)] border border-[var(--line)]">
-                <strong className="block text-[var(--text)] mb-1 font-mono">Zero-Width Tokens</strong>
+                <strong className="block text-[var(--text)] mb-1 font-mono">Zero-Width Tokens (Tier 1)</strong>
                 <span>U+200B (ZWSP), U+200C (ZWNJ), U+200D (ZWJ), U+FEFF (BOM), U+2060 (WJ)</span>
               </div>
               <div className="p-3 rounded-lg bg-[var(--surface-sunken)] border border-[var(--line)]">
-                <strong className="block text-[var(--text)] mb-1 font-mono">Synthetic Spaces</strong>
+                <strong className="block text-[var(--text)] mb-1 font-mono">Tag-Plane Steganography (Tier 2)</strong>
+                <span>U+E0001 - U+E007F (Invisible Unicode Tag plane mirroring ASCII payloads)</span>
+              </div>
+              <div className="p-3 rounded-lg bg-[var(--surface-sunken)] border border-[var(--line)]">
+                <strong className="block text-[var(--text)] mb-1 font-mono">Synthetic Spaces (Tier 3)</strong>
                 <span>U+00A0 (NBSP), U+2000-U+200A (En/Em/Thin/Hair), U+202F, U+3000</span>
               </div>
               <div className="p-3 rounded-lg bg-[var(--surface-sunken)] border border-[var(--line)]">
-                <strong className="block text-[var(--text)] mb-1 font-mono">Homoglyphs & Confusables</strong>
+                <strong className="block text-[var(--text)] mb-1 font-mono">Homoglyphs & Confusables (Tier 4)</strong>
                 <span>Cyrillic & mathematical lookalikes mapped back to standard Latin characters</span>
               </div>
-              <div className="p-3 rounded-lg bg-[var(--surface-sunken)] border border-[var(--line)]">
-                <strong className="block text-[var(--text)] mb-1 font-mono">Bidi & Control Marks</strong>
-                <span>U+200E (LRM), U+200F (RLM), U+202A-U+202E, U+2066-U+2069</span>
+            </div>
+
+            <h4 id="stylometric-disruption" className="text-base font-bold text-[var(--text)] pt-2">
+              AI Cadence & Stylometric Disruption
+            </h4>
+            <p className="text-xs">
+              Statistical detectors scan for unmistakable transitional clichés and fixed n-gram word choices. AIScrubber normalizes over 12 high-frequency AI phrases:
+            </p>
+            <div className="border border-[var(--line)] rounded-xl overflow-hidden text-xs font-mono">
+              <div className="grid grid-cols-12 bg-[var(--surface-sunken)] p-2.5 font-bold text-[var(--text)] border-b border-[var(--line)]">
+                <div className="col-span-6">AI Cliché / Statistical Tell</div>
+                <div className="col-span-6">Normalized Human Alternative</div>
+              </div>
+              <div className="divide-y divide-[var(--line)] bg-[var(--panel)]">
+                <div className="grid grid-cols-12 p-2.5 items-center">
+                  <div className="col-span-6 text-red-400">"delve into" / "delving into"</div>
+                  <div className="col-span-6 text-[var(--accent)] font-semibold">"explore" / "examine"</div>
+                </div>
+                <div className="grid grid-cols-12 p-2.5 items-center">
+                  <div className="col-span-6 text-red-400">"plays a crucial role"</div>
+                  <div className="col-span-6 text-[var(--accent)] font-semibold">"is essential"</div>
+                </div>
+                <div className="grid grid-cols-12 p-2.5 items-center">
+                  <div className="col-span-6 text-red-400">"rich tapestry of"</div>
+                  <div className="col-span-6 text-[var(--accent)] font-semibold">"diverse mix of"</div>
+                </div>
+                <div className="grid grid-cols-12 p-2.5 items-center">
+                  <div className="col-span-6 text-red-400">"a testament to"</div>
+                  <div className="col-span-6 text-[var(--accent)] font-semibold">"proof of"</div>
+                </div>
+                <div className="grid grid-cols-12 p-2.5 items-center">
+                  <div className="col-span-6 text-red-400">"in today's fast-paced digital world"</div>
+                  <div className="col-span-6 text-[var(--accent)] font-semibold">"today"</div>
+                </div>
               </div>
             </div>
 
@@ -183,8 +229,8 @@ When user CUST-44912 (email: billing@partner.org) charges over $500, trigger web
               Available Cleaning Profiles
             </h4>
             <ul className="list-disc pl-5 space-y-1.5 text-xs">
-              <li><strong>Aggressive (All Tiers):</strong> Complete sanitization of zero-width, non-standard spaces, homoglyphs, and AI footers.</li>
-              <li><strong>Claude & LLM Output:</strong> Tuned specifically for Anthropic Claude and ChatGPT response structures.</li>
+              <li><strong>Aggressive (All Tiers):</strong> Complete sanitization of zero-width, tag-plane tokens, non-standard spaces, homoglyphs, and AI footers.</li>
+              <li><strong>Claude & LLM Output:</strong> Tuned specifically for Anthropic Claude and ChatGPT response structures and stylometric markers.</li>
               <li><strong>Code Safe:</strong> Preserves necessary syntax indentation for Python, YAML, JS, and Rust while stripping invisible characters.</li>
               <li><strong>Invisible Unicode Only:</strong> Minimalist mode removing strictly zero-width and bidi characters.</li>
             </ul>
