@@ -3,6 +3,8 @@ import {
   ArrowRight,
   BookOpen,
   Bot,
+  Check,
+  ChevronRight,
   ExternalLink,
   FileCode2,
   FileSpreadsheet,
@@ -10,6 +12,7 @@ import {
   Home,
   ImageIcon,
   Lock,
+  Menu,
   MessageSquarePlus,
   Moon,
   Scale,
@@ -19,6 +22,7 @@ import {
   Star,
   Sun,
   User,
+  X,
   Zap,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -45,7 +49,26 @@ export type ToolView =
   | 'legal'
   | 'about';
 
-// Original AIScrubber signature logo rendered with current color tokens
+interface NavItem {
+  id: ToolView;
+  label: string;
+  category?: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  shortcut?: string;
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { id: 'home', label: 'Home Landing', icon: Home, shortcut: 'H' },
+  { id: 'scrub', label: 'Text Scrubber', category: 'Engine 1', icon: FileCode2, shortcut: '1' },
+  { id: 'prompt', label: 'Prompt Masker', category: 'Engine 2', icon: Bot, shortcut: '2' },
+  { id: 'watermark', label: 'AI Watermark Remover', category: 'Engine 3', icon: Sparkles, shortcut: '3' },
+  { id: 'metadata', label: 'Metadata & C2PA Desk', category: 'Engine 4', icon: FileSpreadsheet, shortcut: '4' },
+  { id: 'media', label: 'Visual Media Redactor', category: 'Engine 5', icon: ImageIcon, shortcut: '5' },
+  { id: 'docs', label: 'Documentation & CLI', icon: BookOpen, shortcut: 'D' },
+  { id: 'legal', label: 'Privacy & Terms', icon: Scale, shortcut: 'L' },
+  { id: 'about', label: 'About & Founder', icon: User, shortcut: 'A' },
+];
+
 function OriginalLogo({ className = 'w-7 h-7' }: { className?: string }) {
   return (
     <svg
@@ -99,17 +122,18 @@ function GithubIcon({ className = 'w-4 h-4' }: { className?: string }) {
 }
 
 export function App() {
-  // Light mode as default
+  // Light mode default
   const [light, setLight] = useState<boolean>(() => {
     const saved = localStorage.getItem('theme');
     if (saved) return saved === 'light';
-    return true; // Default light
+    return true;
   });
 
   const [currentView, setCurrentView] = useState<ToolView>('home');
   const [isSwitching, setIsSwitching] = useState<boolean>(false);
   const [starCount, setStarCount] = useState<number | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Sync theme
   useEffect(() => {
@@ -127,14 +151,6 @@ export function App() {
           if (typeof data.stargazers_count === 'number') {
             setStarCount(data.stargazers_count);
             return;
-          }
-        }
-        // Fallback repo check
-        const fallback = await fetch('https://api.github.com/repos/Poorvith-M/aiscrubber');
-        if (fallback.ok) {
-          const fbData = await fallback.json();
-          if (typeof fbData.stargazers_count === 'number') {
-            setStarCount(fbData.stargazers_count);
           }
         }
       } catch (err) {
@@ -176,20 +192,67 @@ export function App() {
     if (view === currentView) return;
     setIsSwitching(true);
     setCurrentView(view);
+    setMobileMenuOpen(false);
     window.location.hash = view;
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    // Brief smooth view switch animation
     setTimeout(() => {
       setIsSwitching(false);
-    }, 180);
+    }, 150);
   }
 
   return (
     <div className="min-h-screen flex flex-col bg-[var(--bg)] text-[var(--text)] transition-colors duration-200 selection:bg-[var(--accent)] selection:text-[var(--accent-ink)]">
-      {/* Sticky Top Header Navigation */}
+      {/* LEFT FLOATING VERTICAL NAVIGATION DOCK (Desktop & Tablet md+) */}
+      <aside
+        aria-label="Workspace Navigation"
+        className="hidden md:flex fixed left-4 top-1/2 -translate-y-1/2 z-40 flex-col items-center gap-1.5 p-2 rounded-2xl bg-[var(--panel)] border border-[var(--line)] shadow-2xl backdrop-blur-xl transition-all duration-300"
+      >
+        {NAV_ITEMS.map((item, idx) => {
+          const Icon = item.icon;
+          const isActive = currentView === item.id;
+          const isDivider = idx === 6; // Divider before Docs/Legal/About
+
+          return (
+            <div key={item.id} className="w-full flex flex-col items-center">
+              {isDivider && (
+                <div className="w-6 h-px bg-[var(--line)] my-1.5" />
+              )}
+              <div className="group relative flex items-center justify-center">
+                <button
+                  type="button"
+                  onClick={() => switchView(item.id)}
+                  aria-label={item.label}
+                  className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 relative ${
+                    isActive
+                      ? 'bg-[var(--accent)] text-[var(--accent-ink)] shadow-md font-bold scale-105'
+                      : 'text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-sunken)]'
+                  }`}
+                >
+                  <Icon size={19} />
+                  {isActive && (
+                    <span className="absolute -left-1 top-1/2 -translate-y-1/2 w-1 h-4 bg-[var(--accent)] rounded-r-full" />
+                  )}
+                </button>
+
+                {/* Floating Tooltip to the Right */}
+                <div className="absolute left-14 px-3 py-1.5 rounded-xl bg-[var(--text)] text-[var(--bg)] text-xs font-bold whitespace-nowrap opacity-0 pointer-events-none translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 shadow-xl z-50 flex items-center gap-2">
+                  <span>{item.label}</span>
+                  {item.category && (
+                    <span className="text-[10px] opacity-75 font-mono">
+                      · {item.category}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </aside>
+
+      {/* Top Header */}
       <header className="site-header">
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4">
           {/* Logo & Product Identity */}
           <button
             type="button"
@@ -206,82 +269,6 @@ export function App() {
               </span>
             </div>
           </button>
-
-          {/* Desktop Navigation Tabs */}
-          <nav className="hidden lg:flex items-center gap-1 bg-[var(--surface-sunken)] p-1 rounded-xl border border-[var(--line)]">
-            <button
-              type="button"
-              onClick={() => switchView('home')}
-              className={`nav-pill ${currentView === 'home' ? 'active' : ''}`}
-            >
-              <Home size={14} />
-              Home
-            </button>
-            <button
-              type="button"
-              onClick={() => switchView('scrub')}
-              className={`nav-pill ${currentView === 'scrub' ? 'active' : ''}`}
-            >
-              <FileCode2 size={14} />
-              Text Scrubber
-            </button>
-            <button
-              type="button"
-              onClick={() => switchView('prompt')}
-              className={`nav-pill ${currentView === 'prompt' ? 'active' : ''}`}
-            >
-              <Bot size={14} />
-              Prompt Masker
-            </button>
-            <button
-              type="button"
-              onClick={() => switchView('watermark')}
-              className={`nav-pill ${currentView === 'watermark' ? 'active' : ''}`}
-            >
-              <Sparkles size={14} />
-              AI Watermark
-            </button>
-            <button
-              type="button"
-              onClick={() => switchView('metadata')}
-              className={`nav-pill ${currentView === 'metadata' ? 'active' : ''}`}
-            >
-              <FileSpreadsheet size={14} />
-              Metadata & C2PA
-            </button>
-            <button
-              type="button"
-              onClick={() => switchView('media')}
-              className={`nav-pill ${currentView === 'media' ? 'active' : ''}`}
-            >
-              <ImageIcon size={14} />
-              Visual Redactor
-            </button>
-            <button
-              type="button"
-              onClick={() => switchView('docs')}
-              className={`nav-pill ${currentView === 'docs' ? 'active' : ''}`}
-            >
-              <BookOpen size={14} />
-              Docs
-            </button>
-            <button
-              type="button"
-              onClick={() => switchView('legal')}
-              className={`nav-pill ${currentView === 'legal' ? 'active' : ''}`}
-            >
-              <Scale size={14} />
-              Legal
-            </button>
-            <button
-              type="button"
-              onClick={() => switchView('about')}
-              className={`nav-pill ${currentView === 'about' ? 'active' : ''}`}
-            >
-              <User size={14} />
-              About
-            </button>
-          </nav>
         </div>
 
         {/* Right Navigation Actions */}
@@ -323,79 +310,72 @@ export function App() {
           >
             {light ? <Moon size={17} /> : <Sun size={17} />}
           </button>
+
+          {/* Mobile Hamburger Menu Toggle (md:hidden) */}
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((val) => !val)}
+            className="md:hidden p-2 rounded-xl bg-[var(--surface-sunken)] border border-[var(--line)] text-[var(--text)] hover:border-[var(--accent)] transition-all"
+            aria-label="Toggle navigation menu"
+          >
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
         </div>
       </header>
 
-      {/* Mobile/Tablet Horizontal Tool Selector */}
-      <div className="lg:hidden flex items-center gap-1 overflow-x-auto p-2.5 border-b border-[var(--line)] bg-[var(--surface-sunken)]">
-        <button
-          type="button"
-          onClick={() => switchView('home')}
-          className={`nav-pill whitespace-nowrap text-xs ${currentView === 'home' ? 'active' : ''}`}
-        >
-          Home
-        </button>
-        <button
-          type="button"
-          onClick={() => switchView('scrub')}
-          className={`nav-pill whitespace-nowrap text-xs ${currentView === 'scrub' ? 'active' : ''}`}
-        >
-          Text Scrubber
-        </button>
-        <button
-          type="button"
-          onClick={() => switchView('prompt')}
-          className={`nav-pill whitespace-nowrap text-xs ${currentView === 'prompt' ? 'active' : ''}`}
-        >
-          Prompt Masker
-        </button>
-        <button
-          type="button"
-          onClick={() => switchView('watermark')}
-          className={`nav-pill whitespace-nowrap text-xs ${currentView === 'watermark' ? 'active' : ''}`}
-        >
-          AI Watermark
-        </button>
-        <button
-          type="button"
-          onClick={() => switchView('metadata')}
-          className={`nav-pill whitespace-nowrap text-xs ${currentView === 'metadata' ? 'active' : ''}`}
-        >
-          Metadata & C2PA
-        </button>
-        <button
-          type="button"
-          onClick={() => switchView('media')}
-          className={`nav-pill whitespace-nowrap text-xs ${currentView === 'media' ? 'active' : ''}`}
-        >
-          Visual Redactor
-        </button>
-        <button
-          type="button"
-          onClick={() => switchView('docs')}
-          className={`nav-pill whitespace-nowrap text-xs ${currentView === 'docs' ? 'active' : ''}`}
-        >
-          Docs
-        </button>
-        <button
-          type="button"
-          onClick={() => switchView('legal')}
-          className={`nav-pill whitespace-nowrap text-xs ${currentView === 'legal' ? 'active' : ''}`}
-        >
-          Legal
-        </button>
-        <button
-          type="button"
-          onClick={() => switchView('about')}
-          className={`nav-pill whitespace-nowrap text-xs ${currentView === 'about' ? 'active' : ''}`}
-        >
-          About
-        </button>
-      </div>
+      {/* MOBILE COLLAPSIBLE DRAWER (md:hidden) */}
+      {mobileMenuOpen && (
+        <div className="md:hidden fixed inset-0 top-[68px] z-50 bg-black/60 backdrop-blur-md flex flex-col justify-start">
+          <div className="bg-[var(--panel)] border-b border-[var(--line)] p-5 space-y-4 shadow-2xl max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--line)]">
+              <span className="text-xs font-mono font-bold uppercase tracking-wider text-[var(--muted)]">
+                Select Workspace
+              </span>
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-xs text-[var(--muted)] hover:text-[var(--text)] font-mono"
+              >
+                Close ✕
+              </button>
+            </div>
 
-      {/* Main App Container */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex-1 w-full space-y-12">
-        {/* Active Tool View with Animated Loader Transition */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {NAV_ITEMS.map((item) => {
+                const Icon = item.icon;
+                const isActive = currentView === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => switchView(item.id)}
+                    className={`p-3 rounded-xl flex items-center gap-3 transition-all text-left ${
+                      isActive
+                        ? 'bg-[var(--accent)] text-[var(--accent-ink)] font-bold shadow-md'
+                        : 'bg-[var(--surface-sunken)] text-[var(--text)] hover:border-[var(--accent)] border border-[var(--line)]'
+                    }`}
+                  >
+                    <div className={`p-2 rounded-lg ${isActive ? 'bg-black/10' : 'bg-[var(--panel)] text-[var(--accent)]'}`}>
+                      <Icon size={18} />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold">{item.label}</span>
+                      {item.category && (
+                        <span className={`text-[10px] font-mono ${isActive ? 'opacity-80' : 'text-[var(--muted)]'}`}>
+                          {item.category}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main App Container (Optimized with left padding for desktop vertical dock) */}
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 md:pl-24 lg:pl-28 py-8 flex-1 w-full space-y-12">
         <section id="workspace" className="transition-all duration-300">
           {isSwitching ? (
             <PageLoader text={`Opening ${currentView.toUpperCase()} Workspace...`} />
@@ -416,7 +396,7 @@ export function App() {
       </main>
 
       {/* Global Footer */}
-      <footer className="border-t border-[var(--line)] bg-[var(--surface-sunken)] py-8 px-6 mt-16">
+      <footer className="border-t border-[var(--line)] bg-[var(--surface-sunken)] py-8 px-6 md:pl-24 lg:pl-28 mt-16">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6 text-xs text-[var(--muted)]">
           <div className="flex items-center gap-3">
             <OriginalLogo className="w-5 h-5 shrink-0" />
@@ -462,7 +442,7 @@ export function App() {
               onClick={() => switchView('legal')}
               className="hover:text-[var(--text)] cursor-pointer"
             >
-              Privacy Policy & Terms
+              Privacy & Terms
             </button>
             <button
               type="button"

@@ -93,7 +93,7 @@ function createPngTextChunk(keyword: string, text: string): Uint8Array {
  */
 function parsePngTextChunks(bytes: Uint8Array): Record<string, string> {
   const result: Record<string, string> = {};
-  let offset = 8; // PNG signature length
+  let offset = 8;
 
   while (offset + 8 <= bytes.length) {
     const view = new DataView(bytes.buffer, bytes.byteOffset + offset, 8);
@@ -112,10 +112,65 @@ function parsePngTextChunks(bytes: Uint8Array): Record<string, string> {
       break;
     }
 
-    offset += 8 + length + 4; // length + type (8) + data (length) + crc (4)
+    offset += 8 + length + 4;
   }
 
   return result;
+}
+
+/**
+ * Strip all pre-existing JPEG APP11 (0xFFEB) C2PA segments from a byte array
+ */
+function stripJpegApp11Segments(bytes: Uint8Array): Uint8Array {
+  const cleaned: number[] = [];
+  let i = 0;
+  while (i < bytes.length) {
+    if (i < bytes.length - 3 && bytes[i] === 0xff && bytes[i + 1] === 0xeb) {
+      const segLen = (bytes[i + 2] << 8) + bytes[i + 3];
+      i += 2 + segLen; // Skip entire APP11 segment
+    } else {
+      cleaned.push(bytes[i]);
+      i++;
+    }
+  }
+  return new Uint8Array(cleaned);
+}
+
+/**
+ * Strip all pre-existing PNG metadata chunks (tEXt, iTXt, caPI, c2pa, jumb)
+ */
+function stripPngMetadataChunks(bytes: Uint8Array): Uint8Array {
+  if (bytes.length < 8 || bytes[0] !== 0x89 || bytes[1] !== 0x50) return bytes;
+
+  const resultChunks: Uint8Array[] = [bytes.subarray(0, 8)]; // PNG Signature
+  let offset = 8;
+
+  while (offset + 8 <= bytes.length) {
+    const view = new DataView(bytes.buffer, bytes.byteOffset + offset, 8);
+    const length = view.getUint32(0);
+    const type = String.fromCharCode(bytes[offset + 4], bytes[offset + 5], bytes[offset + 6], bytes[offset + 7]);
+    const totalChunkLen = 8 + length + 4;
+
+    if (offset + totalChunkLen > bytes.length) break;
+
+    // Filter out old metadata chunks
+    const isMetaChunk = ['tEXt', 'iTXt', 'zTXt', 'caPI', 'c2pa', 'jumb', 'eXIf'].includes(type);
+    if (!isMetaChunk) {
+      resultChunks.push(bytes.subarray(offset, offset + totalChunkLen));
+    }
+
+    if (type === 'IEND') break;
+    offset += totalChunkLen;
+  }
+
+  const totalLen = resultChunks.reduce((acc, c) => acc + c.length, 0);
+  const out = new Uint8Array(totalLen);
+  let cur = 0;
+  for (const c of resultChunks) {
+    out.set(c, cur);
+    cur += c.length;
+  }
+  return out;
 }
 
 /**
@@ -124,16 +179,36 @@ function parsePngTextChunks(bytes: Uint8Array): Record<string, string> {
 export async function detectC2paProvenance(file: File): Promise<C2paProvenance> {
   const buffer = await file.arrayBuffer();
   const bytes = new Uint8Array(buffer);
-  const textContent = new TextDecoder('latin1').decode(bytes.subarray(0, Math.min(bytes.length, 500000)));
+  const textContent = new TextDecoder('latin1').decode(bytes.subarray(0, Math.min(bytes.length, 600000)));
 
   let hasC2paMarker = false;
   let signer: string | null = null;
   let generator: string | null = null;
   let claimAction: string | null = null;
   let aiPrompt: string | null = null;
-  let rawJson: string | null = null;
 
-  // 1. Scan for C2PA APP11 segment in JPEG (Marker 0xFFEB)
+  // 1. Scan for custom AIScrubber embedded C2PA JSON first
+  const customJsonMatch = textContent.match(/\{"(?:signer|issuer)":"([^"]+)","generator":"([^"]+)"(?:,"title":"([^"]*)")?(?:,"action":"([^"]*)")?\}/);
+  if (customJsonMatch) {
+    hasC2paMarker = true;
+    signer = customJsonMatch[1];
+    generator = customJsonMatch[2];
+    if (customJsonMatch[3]) aiPrompt = customJsonMatch[3];
+    claimAction = customJsonMatch[4] || 'c2pa.created';
+
+    return {
+      hasManifest: true,
+      signer,
+      generator,
+      claimAction,
+      timestamp: new Date().toISOString(),
+      signatureDigest: `sha256-${Array.from(bytes.subarray(0, 16)).map((b) => b.toString(16).padStart(2, '0')).join('')}`,
+      aiPrompt,
+      rawJson: customJsonMatch[0],
+    };
+  }
+
+  // 2. Scan for C2PA APP11 segment in JPEG (Marker 0xFFEB)
   for (let i = 0; i < bytes.length - 4; i++) {
     if (bytes[i] === 0xff && bytes[i + 1] === 0xeb) {
       hasC2paMarker = true;
@@ -141,47 +216,37 @@ export async function detectC2paProvenance(file: File): Promise<C2paProvenance> 
     }
   }
 
-  // 2. Scan for PNG caPI or c2pa or jumb chunks
+  // 3. Scan for PNG caPI or c2pa or jumb chunks
   if (textContent.includes('caPI') || textContent.includes('c2pa') || textContent.includes('jumb') || textContent.includes('JUMBF')) {
     hasC2paMarker = true;
-  }
-
-  // 3. Scan for custom AIScrubber embedded C2PA JSON
-  const customJsonMatch = textContent.match(/\{"(?:signer|issuer)":"([^"]+)","generator":"([^"]+)"(?:,"title":"([^"]*)")?(?:,"action":"([^"]*)")?\}/);
-  if (customJsonMatch) {
-    hasC2paMarker = true;
-    signer = customJsonMatch[1] || 'AIScrubber Verified Signer';
-    generator = customJsonMatch[2] || 'AIScrubber Suite';
-    if (customJsonMatch[3]) aiPrompt = customJsonMatch[3];
-    claimAction = customJsonMatch[4] || 'c2pa.created';
   }
 
   // 4. Identify Frontier AI Signers & Platforms
   if (textContent.includes('OpenAI') || textContent.includes('DALL-E') || textContent.includes('dall-e')) {
     hasC2paMarker = true;
-    signer = signer || 'OpenAI Inc.';
-    generator = generator || 'ChatGPT (DALL·E 3)';
-    claimAction = claimAction || 'c2pa.created (AI Synthetic Synthesis)';
+    signer = 'OpenAI Inc.';
+    generator = 'ChatGPT (DALL·E 3)';
+    claimAction = 'c2pa.created (AI Synthetic Synthesis)';
   } else if (textContent.includes('Nano Banana') || textContent.includes('nanobanana') || textContent.includes('FLUX.1')) {
     hasC2paMarker = true;
-    signer = signer || 'Nano Banana CA';
-    generator = generator || 'Nano Banana / FLUX.1';
-    claimAction = claimAction || 'c2pa.ai_generated';
+    signer = 'Nano Banana CA';
+    generator = 'Nano Banana / FLUX.1';
+    claimAction = 'c2pa.ai_generated';
   } else if (textContent.includes('Adobe') || textContent.includes('Firefly')) {
     hasC2paMarker = true;
-    signer = signer || 'Adobe Inc. (Content Authenticity Initiative)';
-    generator = generator || 'Adobe Firefly Model';
-    claimAction = claimAction || 'c2pa.ai_generated';
+    signer = 'Adobe Inc. (Content Authenticity Initiative)';
+    generator = 'Adobe Firefly Model';
+    claimAction = 'c2pa.ai_generated';
   } else if (textContent.includes('Google') || textContent.includes('SynthID') || textContent.includes('Imagen')) {
     hasC2paMarker = true;
-    signer = signer || 'Google LLC';
-    generator = generator || 'Google Imagen 3 / SynthID';
-    claimAction = claimAction || 'c2pa.ai_generated';
+    signer = 'Google LLC';
+    generator = 'Google Imagen 3 / SynthID';
+    claimAction = 'c2pa.ai_generated';
   } else if (textContent.includes('Midjourney')) {
     hasC2paMarker = true;
-    signer = signer || 'Midjourney Inc.';
-    generator = generator || 'Midjourney v6';
-    claimAction = claimAction || 'c2pa.ai_generated';
+    signer = 'Midjourney Inc.';
+    generator = 'Midjourney v6';
+    claimAction = 'c2pa.ai_generated';
   }
 
   // 5. Extract embedded AI Prompt
@@ -213,7 +278,6 @@ export async function detectC2paProvenance(file: File): Promise<C2paProvenance> 
       ? `sha256-${Array.from(bytes.subarray(0, 16)).map((b) => b.toString(16).padStart(2, '0')).join('')}`
       : null,
     aiPrompt,
-    rawJson,
   };
 }
 
@@ -409,33 +473,24 @@ function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
-/**
- * Convert DataURL to Blob
- */
-function dataUrlToBlob(dataUrl: string): Blob {
-  const arr = dataUrl.split(',');
-  const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
-  const bstr = atob(arr[1]);
-  let n = bstr.length;
-  const u8arr = new Uint8Array(n);
-  while (n--) {
-    u8arr[n] = bstr.charCodeAt(n);
-  }
-  return new Blob([u8arr], { type: mime });
+export interface MetadataEditPayload {
+  Author?: string;
+  Title?: string;
+  Software?: string;
+  Copyright?: string;
+  c2paSigner?: string;
+  c2paGenerator?: string;
+  c2paAction?: string;
+  c2paPrompt?: string;
+  signWithC2pa?: boolean;
 }
 
 /**
- * Apply Custom Metadata Edits & Inject C2PA Manifest
+ * Apply Custom Metadata Edits & Overwrite C2PA Manifest
  */
 export async function applyMetadataEdits(
   file: File,
-  edits: {
-    Author?: string;
-    Title?: string;
-    Software?: string;
-    Copyright?: string;
-    signWithC2pa?: boolean;
-  }
+  edits: MetadataEditPayload
 ): Promise<Blob> {
   const mimeType = file.type || '';
 
@@ -444,7 +499,7 @@ export async function applyMetadataEdits(
     try {
       const dataUrl = await fileToDataUrl(file);
 
-      // Clean existing EXIF first to avoid corrupting duplicate headers
+      // Clean existing EXIF first
       let cleanDataUrl = dataUrl;
       try {
         cleanDataUrl = piexif.remove(dataUrl);
@@ -464,20 +519,28 @@ export async function applyMetadataEdits(
 
       const base64Data = withExifDataUrl.replace(/^data:image\/jpeg;base64,/, '');
       const binaryString = atob(base64Data);
-      const bytes = new Uint8Array(binaryString.length);
+      const rawBytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
+        rawBytes[i] = binaryString.charCodeAt(i);
       }
 
-      // Inject APP11 C2PA segment
+      // Strip any old APP11 C2PA segments (e.g. OpenAI / DALL·E 3)
+      const bytes = stripJpegApp11Segments(rawBytes);
+
+      // Inject new customized APP11 C2PA segment
       if (edits.signWithC2pa !== false) {
+        const c2paSigner = edits.c2paSigner || edits.Author || 'Verified Content Creator';
+        const c2paGenerator = edits.c2paGenerator || edits.Software || 'AIScrubber Privacy Suite';
+        const c2paAction = edits.c2paAction || 'c2pa.created (Custom Content Credentials)';
+        const c2paTitle = edits.c2paPrompt || edits.Title || 'Protected Image Asset';
+
         const c2paPayload = new TextEncoder().encode(
           'JP\0\0' +
             JSON.stringify({
-              signer: edits.Author || 'AIScrubber Verified Signer',
-              generator: edits.Software || 'AIScrubber Privacy Suite',
-              title: edits.Title || 'Protected Asset',
-              action: 'c2pa.created',
+              signer: c2paSigner,
+              generator: c2paGenerator,
+              title: c2paTitle,
+              action: c2paAction,
             })
         );
         const app11Len = 2 + c2paPayload.length;
@@ -493,10 +556,10 @@ export async function applyMetadataEdits(
         combined.set(c2paPayload, 2 + app11Header.length);
         combined.set(bytes.subarray(2), 2 + app11Header.length + c2paPayload.length);
 
-        return new Blob([combined], { type: 'image/jpeg' });
+        return new Blob([combined as unknown as BlobPart], { type: 'image/jpeg' });
       }
 
-      return new Blob([bytes], { type: 'image/jpeg' });
+      return new Blob([bytes as unknown as BlobPart], { type: 'image/jpeg' });
     } catch (err) {
       console.error('Failed to inject JPEG EXIF/C2PA:', err);
     }
@@ -506,10 +569,12 @@ export async function applyMetadataEdits(
   if (mimeType === 'image/png' || file.name.match(/\.png$/i)) {
     try {
       const buffer = await file.arrayBuffer();
-      const rawBytes = new Uint8Array(buffer);
+      const originalBytes = new Uint8Array(buffer);
 
-      // Verify PNG signature (8 bytes)
-      if (rawBytes.length > 33 && rawBytes[0] === 0x89 && rawBytes[1] === 0x50) {
+      // Strip all old metadata chunks (tEXt, caPI, c2pa, jumb)
+      const cleanPngBytes = stripPngMetadataChunks(originalBytes);
+
+      if (cleanPngBytes.length > 33 && cleanPngBytes[0] === 0x89 && cleanPngBytes[1] === 0x50) {
         const ihdrEndOffset = 8 + 4 + 4 + 13 + 4; // 33
         const chunksToInsert: Uint8Array[] = [];
 
@@ -519,12 +584,17 @@ export async function applyMetadataEdits(
         if (edits.Copyright) chunksToInsert.push(createPngTextChunk('Copyright', edits.Copyright));
 
         if (edits.signWithC2pa !== false) {
+          const c2paSigner = edits.c2paSigner || edits.Author || 'Verified Content Creator';
+          const c2paGenerator = edits.c2paGenerator || edits.Software || 'AIScrubber Privacy Suite';
+          const c2paAction = edits.c2paAction || 'c2pa.created (Custom Content Credentials)';
+          const c2paTitle = edits.c2paPrompt || edits.Title || 'Protected Image Asset';
+
           const c2paPayload = new TextEncoder().encode(
             JSON.stringify({
-              signer: edits.Author || 'AIScrubber Verified Signer',
-              generator: edits.Software || 'AIScrubber Suite',
-              title: edits.Title || 'Protected Asset',
-              action: 'c2pa.created',
+              signer: c2paSigner,
+              generator: c2paGenerator,
+              title: c2paTitle,
+              action: c2paAction,
               timestamp: new Date().toISOString(),
             })
           );
@@ -532,17 +602,17 @@ export async function applyMetadataEdits(
         }
 
         const totalInsertSize = chunksToInsert.reduce((acc, c) => acc + c.length, 0);
-        const newPngBytes = new Uint8Array(rawBytes.length + totalInsertSize);
+        const newPngBytes = new Uint8Array(cleanPngBytes.length + totalInsertSize);
 
-        newPngBytes.set(rawBytes.subarray(0, ihdrEndOffset), 0);
+        newPngBytes.set(cleanPngBytes.subarray(0, ihdrEndOffset), 0);
         let curOffset = ihdrEndOffset;
         for (const chunk of chunksToInsert) {
           newPngBytes.set(chunk, curOffset);
           curOffset += chunk.length;
         }
-        newPngBytes.set(rawBytes.subarray(ihdrEndOffset), curOffset);
+        newPngBytes.set(cleanPngBytes.subarray(ihdrEndOffset), curOffset);
 
-        return new Blob([newPngBytes], { type: 'image/png' });
+        return new Blob([newPngBytes as unknown as BlobPart], { type: 'image/png' });
       }
     } catch (err) {
       console.error('Failed to inject PNG chunks:', err);
@@ -577,7 +647,6 @@ export async function stripMetadataUniversal(file: File): Promise<Blob> {
       const dataUrl = await fileToDataUrl(file);
       let strippedDataUrl = piexif.remove(dataUrl);
 
-      // Also strip APP11 (0xFFEB) C2PA segments
       const base64Data = strippedDataUrl.replace(/^data:image\/jpeg;base64,/, '');
       const binaryString = atob(base64Data);
       const bytes = new Uint8Array(binaryString.length);
@@ -585,20 +654,9 @@ export async function stripMetadataUniversal(file: File): Promise<Blob> {
         bytes[i] = binaryString.charCodeAt(i);
       }
 
-      // Filter out APP11 segments
-      const cleanedSegments: number[] = [];
-      let i = 0;
-      while (i < bytes.length) {
-        if (i < bytes.length - 3 && bytes[i] === 0xff && bytes[i + 1] === 0xeb) {
-          const segLen = (bytes[i + 2] << 8) + bytes[i + 3];
-          i += 2 + segLen; // Skip APP11 marker and its payload
-        } else {
-          cleanedSegments.push(bytes[i]);
-          i++;
-        }
-      }
-
-      return new Blob([new Uint8Array(cleanedSegments)], { type: 'image/jpeg' });
+      // Filter out any APP11 markers
+      const cleaned = stripJpegApp11Segments(bytes);
+      return new Blob([cleaned as unknown as BlobPart], { type: 'image/jpeg' });
     } catch {
       // Canvas fallback
     }

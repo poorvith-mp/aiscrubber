@@ -43,7 +43,6 @@ export function MetadataWorkspace() {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
-  const [signWithC2pa, setSignWithC2pa] = useState(true);
 
   // Editable metadata state
   const [editFields, setEditFields] = useState<Record<string, string>>({
@@ -52,6 +51,13 @@ export function MetadataWorkspace() {
     Copyright: '',
     Software: '',
   });
+
+  // Dedicated C2PA Editor state
+  const [signWithC2pa, setSignWithC2pa] = useState(true);
+  const [c2paSigner, setC2paSigner] = useState('');
+  const [c2paGenerator, setC2paGenerator] = useState('');
+  const [c2paAction, setC2paAction] = useState('c2pa.created (Custom Content Credentials)');
+  const [c2paPrompt, setC2paPrompt] = useState('');
 
   async function handleFileSelect(selectedFile: File) {
     setFile(selectedFile);
@@ -64,16 +70,27 @@ export function MetadataWorkspace() {
       setMetadata(parsed);
 
       const authorField = parsed.fields.find((f) => f.category === 'author' || f.tag.includes('Artist') || f.tag.includes('Author'));
-      const titleField = parsed.fields.find((f) => f.tag.includes('Title') || f.tag.includes('ImageDescription') || f.tag.includes('Prompt'));
+      const titleField = parsed.fields.find((f) => f.tag.includes('Title') || f.tag.includes('ImageDescription'));
       const softwareField = parsed.fields.find((f) => f.tag.includes('Software') || f.tag.includes('Creator'));
       const copyField = parsed.fields.find((f) => f.tag.includes('Copyright'));
 
+      const initialAuthor = authorField?.value || parsed.c2pa?.signer || 'Poorvith M P';
+      const initialTitle = titleField?.value || parsed.c2pa?.aiPrompt || '';
+      const initialSoftware = softwareField?.value || parsed.c2pa?.generator || 'AIScrubber Suite v2.2.0';
+      const initialCopyright = copyField?.value || 'CC-BY 4.0 / All Rights Reserved';
+
       setEditFields({
-        Author: authorField?.value || parsed.c2pa?.signer || '',
-        Title: titleField?.value || parsed.c2pa?.aiPrompt || '',
-        Software: softwareField?.value || parsed.c2pa?.generator || 'AIScrubber Suite v2.2.0',
-        Copyright: copyField?.value || '',
+        Author: initialAuthor,
+        Title: initialTitle,
+        Software: initialSoftware,
+        Copyright: initialCopyright,
       });
+
+      // Pre-fill C2PA Editor fields
+      setC2paSigner(parsed.c2pa?.signer || initialAuthor);
+      setC2paGenerator(parsed.c2pa?.generator || initialSoftware);
+      setC2paAction(parsed.c2pa?.claimAction || 'c2pa.created (Custom Content Credentials)');
+      setC2paPrompt(parsed.c2pa?.aiPrompt || initialTitle);
     } catch (err) {
       console.error('Failed to parse metadata', err);
     } finally {
@@ -122,10 +139,14 @@ export function MetadataWorkspace() {
         Title: editFields.Title,
         Software: editFields.Software,
         Copyright: editFields.Copyright,
+        c2paSigner: c2paSigner || editFields.Author,
+        c2paGenerator: c2paGenerator || editFields.Software,
+        c2paAction,
+        c2paPrompt: c2paPrompt || editFields.Title,
         signWithC2pa,
       });
 
-      setStatusMessage('Custom Metadata & C2PA Manifest successfully encoded! Re-upload this downloaded file anytime to inspect the verified [CR] card and metadata attributes.');
+      setStatusMessage('Custom Metadata & C2PA Manifest successfully encoded! All old C2PA tags were wiped and replaced. Re-upload this downloaded file anytime to inspect the verified [CR] card and custom attributes.');
 
       const url = URL.createObjectURL(modifiedBlob);
       const a = document.createElement('a');
@@ -164,7 +185,7 @@ export function MetadataWorkspace() {
             Metadata & C2PA Provenance Desk
           </h2>
           <p className="text-sm text-[var(--muted)] mt-1">
-            Inspect C2PA Content Credentials (ChatGPT, DALL·E 3, Nano Banana), edit custom author tags in-place, or strip 100% of metadata client-side.
+            Inspect & Edit C2PA Content Credentials (ChatGPT, DALL·E 3, Nano Banana), customize author tags in-place, or strip 100% of metadata client-side.
           </p>
         </div>
 
@@ -192,7 +213,7 @@ export function MetadataWorkspace() {
               }`}
             >
               <Edit3 size={14} />
-              Edit / Inject Metadata
+              Edit Metadata & C2PA
             </button>
             <button
               type="button"
@@ -323,14 +344,24 @@ export function MetadataWorkspace() {
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={handleQuickStrip}
-                      className="btn-secondary text-xs font-bold text-red-400 hover:border-red-500/40 hover:bg-red-500/10 flex items-center gap-1.5 self-start sm:self-auto"
-                    >
-                      <Trash2 size={13} />
-                      Strip C2PA Manifest
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('edit')}
+                        className="btn-secondary text-xs font-bold flex items-center gap-1.5"
+                      >
+                        <Edit3 size={13} />
+                        Edit C2PA Details
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleQuickStrip}
+                        className="btn-secondary text-xs font-bold text-red-400 hover:border-red-500/40 hover:bg-red-500/10 flex items-center gap-1.5"
+                      >
+                        <Trash2 size={13} />
+                        Strip Manifest
+                      </button>
+                    </div>
                   </div>
 
                   {/* Provenance Details Grid */}
@@ -472,99 +503,179 @@ export function MetadataWorkspace() {
             </div>
           )}
 
-          {/* TAB 2: METADATA EDITOR & C2PA INJECTOR */}
+          {/* TAB 2: METADATA EDITOR & C2PA OVERWRITE */}
           {activeTab === 'edit' && (
             <div className="p-6 rounded-2xl bg-[var(--surface-sunken)] border border-[var(--line)] space-y-6">
               <div>
                 <h3 className="font-headline font-bold text-lg mb-1">
-                  In-Place Metadata Injection & C2PA Signer
+                  Custom Metadata & C2PA Manifest Editor
                 </h3>
                 <p className="text-xs text-[var(--muted)]">
-                  Overwrites or injects custom fields into JPEG EXIF/APP11, PNG tEXt/caPI chunks, PDF trailers, or ID3 containers while stripping GPS coordinates.
+                  Wipes any old pre-existing AI provenance (OpenAI, ChatGPT, Adobe, Nano Banana) and encodes your custom metadata and C2PA credentials directly into the binary stream.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-[var(--muted)]">
-                    Creator / Author Name
-                  </label>
-                  <input
-                    type="text"
-                    value={editFields.Author}
-                    onChange={(e) =>
-                      setEditFields({ ...editFields, Author: e.target.value })
-                    }
-                    placeholder="e.g. Poorvith M P"
-                    className="input-field text-xs font-mono"
-                  />
-                </div>
+              {/* Section 1: Standard EXIF / Document Fields */}
+              <div className="space-y-3">
+                <span className="text-xs font-mono font-bold uppercase tracking-wider text-[var(--muted)] block">
+                  1. Standard Metadata Attributes
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-[var(--muted)]">
+                      Creator / Author Name
+                    </label>
+                    <input
+                      type="text"
+                      value={editFields.Author}
+                      onChange={(e) => {
+                        setEditFields({ ...editFields, Author: e.target.value });
+                        if (!c2paSigner || c2paSigner === editFields.Author) setC2paSigner(e.target.value);
+                      }}
+                      placeholder="e.g. Poorvith M P"
+                      className="input-field text-xs font-mono"
+                    />
+                  </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-[var(--muted)]">
-                    Document / Image Title / Prompt
-                  </label>
-                  <input
-                    type="text"
-                    value={editFields.Title}
-                    onChange={(e) =>
-                      setEditFields({ ...editFields, Title: e.target.value })
-                    }
-                    placeholder="e.g. Architecture Blueprint"
-                    className="input-field text-xs font-mono"
-                  />
-                </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-[var(--muted)]">
+                      Document / Image Title
+                    </label>
+                    <input
+                      type="text"
+                      value={editFields.Title}
+                      onChange={(e) => {
+                        setEditFields({ ...editFields, Title: e.target.value });
+                        if (!c2paPrompt || c2paPrompt === editFields.Title) setC2paPrompt(e.target.value);
+                      }}
+                      placeholder="e.g. Architecture Blueprint"
+                      className="input-field text-xs font-mono"
+                    />
+                  </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-[var(--muted)]">
-                    Software / Generator Fingerprint
-                  </label>
-                  <input
-                    type="text"
-                    value={editFields.Software}
-                    onChange={(e) =>
-                      setEditFields({ ...editFields, Software: e.target.value })
-                    }
-                    placeholder="e.g. AIScrubber Suite v2.2.0"
-                    className="input-field text-xs font-mono"
-                  />
-                </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-[var(--muted)]">
+                      Software / Tool Fingerprint
+                    </label>
+                    <input
+                      type="text"
+                      value={editFields.Software}
+                      onChange={(e) => {
+                        setEditFields({ ...editFields, Software: e.target.value });
+                        if (!c2paGenerator || c2paGenerator === editFields.Software) setC2paGenerator(e.target.value);
+                      }}
+                      placeholder="e.g. AIScrubber Suite v2.2.0"
+                      className="input-field text-xs font-mono"
+                    />
+                  </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-[var(--muted)]">
-                    Copyright Notice
-                  </label>
-                  <input
-                    type="text"
-                    value={editFields.Copyright}
-                    onChange={(e) =>
-                      setEditFields({ ...editFields, Copyright: e.target.value })
-                    }
-                    placeholder="e.g. CC-BY 4.0 / Public Domain"
-                    className="input-field text-xs font-mono"
-                  />
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-[var(--muted)]">
+                      Copyright Notice
+                    </label>
+                    <input
+                      type="text"
+                      value={editFields.Copyright}
+                      onChange={(e) =>
+                        setEditFields({ ...editFields, Copyright: e.target.value })
+                      }
+                      placeholder="e.g. CC-BY 4.0 / Public Domain"
+                      className="input-field text-xs font-mono"
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* Sign with C2PA Toggle */}
-              <div className="p-3.5 rounded-xl bg-[var(--panel)] border border-[var(--line)] flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <span className="text-xs font-bold flex items-center gap-1.5 text-emerald-400">
-                    <ShieldCheck size={14} />
-                    Sign with C2PA Content Credentials [CR] Manifest
-                  </span>
-                  <p className="text-[11px] text-[var(--muted)]">
-                    Embeds verifiable cryptographic provenance box (APP11 JUMBF in JPEG, caPI chunk in PNG) so detectors immediately verify your authorship.
-                  </p>
+              {/* Section 2: C2PA Content Credentials Editor */}
+              <div className="p-4 rounded-xl bg-[var(--panel)] border border-emerald-500/30 space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-[var(--line)]">
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold flex items-center gap-1.5 text-emerald-400 font-headline">
+                      <ShieldCheck size={15} />
+                      2. C2PA Content Credentials [CR] Signer & Overwrite
+                    </span>
+                    <p className="text-[11px] text-[var(--muted)]">
+                      Wipes legacy OpenAI/Adobe C2PA signatures and injects your verified custom manifest.
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={signWithC2pa}
+                    onChange={(e) => setSignWithC2pa(e.target.checked)}
+                    className="accent-emerald-500 w-4 h-4 cursor-pointer"
+                  />
                 </div>
-                <input
-                  type="checkbox"
-                  checked={signWithC2pa}
-                  onChange={(e) => setSignWithC2pa(e.target.checked)}
-                  className="accent-[var(--accent)] w-4 h-4 cursor-pointer"
-                />
+
+                {signWithC2pa && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-[var(--muted)]">
+                        C2PA Signer / Issuer Name
+                      </label>
+                      <input
+                        type="text"
+                        value={c2paSigner}
+                        onChange={(e) => setC2paSigner(e.target.value)}
+                        placeholder="e.g. Poorvith or Custom Studio CA"
+                        className="input-field text-xs font-mono"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-[var(--muted)]">
+                        AI Generator / Model Tool Name
+                      </label>
+                      <input
+                        type="text"
+                        value={c2paGenerator}
+                        onChange={(e) => setC2paGenerator(e.target.value)}
+                        placeholder="e.g. AIScrubber Privacy Suite or Custom Engine"
+                        className="input-field text-xs font-mono"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-[var(--muted)]">
+                        Claim Action
+                      </label>
+                      <select
+                        value={c2paAction}
+                        onChange={(e) => setC2paAction(e.target.value)}
+                        className="input-field text-xs font-mono bg-[var(--surface-sunken)]"
+                      >
+                        <option value="c2pa.created (Custom Content Credentials)">
+                          c2pa.created (Custom Content Credentials)
+                        </option>
+                        <option value="c2pa.created (Authored by Human)">
+                          c2pa.created (Authored by Human)
+                        </option>
+                        <option value="c2pa.edited (Modified & Retouched)">
+                          c2pa.edited (Modified & Retouched)
+                        </option>
+                        <option value="c2pa.anonymized (Privacy Protected)">
+                          c2pa.anonymized (Privacy Protected)
+                        </option>
+                        <option value="c2pa.ai_generated">c2pa.ai_generated</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-[var(--muted)]">
+                        Embedded AI Prompt / Claim Title
+                      </label>
+                      <input
+                        type="text"
+                        value={c2paPrompt}
+                        onChange={(e) => setC2paPrompt(e.target.value)}
+                        placeholder="e.g. A futuristic landscape, 8k resolution"
+                        className="input-field text-xs font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
+              {/* Action Buttons */}
               <div className="pt-4 border-t border-[var(--line)] flex items-center justify-between flex-wrap gap-4">
                 <span className="text-xs text-[var(--muted)] font-mono">
                   100% Client-Side Binary Stream Encoding
@@ -576,7 +687,7 @@ export function MetadataWorkspace() {
                   className="btn-primary text-xs font-bold flex items-center gap-1.5 shadow-md hover:scale-105 transition-all"
                 >
                   <Save size={14} />
-                  {isSavingEdit ? 'Encoding & Saving...' : 'Apply & Download Edited File'}
+                  {isSavingEdit ? 'Encoding & Saving...' : 'Save & Download Custom Binary'}
                 </button>
               </div>
             </div>
