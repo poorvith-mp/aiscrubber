@@ -1,0 +1,22 @@
+# AIScrubber
+
+> A zero-telemetry browser-local privacy desk, developer CLI, and Model Context Protocol (MCP) server engineered by Poorvith M P (https://poorvithmp.com).
+
+## Core Capabilities
+- **C2PA Content Credentials [CR] Stripper & Signer**: Detects, wipes, or customizes cryptographic provenance manifests (APP11 JUMBF segments in JPEG, caPI chunks in PNG) embedded by ChatGPT (DALL·E 3), Nano Banana, Adobe Firefly, and Google Imagen in 100% local memory.
+- **AI Text & Claude Invisible Watermark Remover**: Strips zero-width characters (ZWSP, ZWNJ, ZWJ, BOM, Word Joiners), Unicode Tag-Plane steganography (U+E0001-U+E007F), variation selectors, non-standard spaces, confusable homoglyphs, and AI stylometric cadence clichés.
+- **Text & Incident Log Scrubber**: Replaces sensitive emails, API keys, Bearer tokens, IP addresses, payment cards, and customer IDs with numbered tokens ([EMAIL_1], [SECRET_1]).
+- **Prompt Enhancer & Roundtrip Anonymizer**: Masks secrets into {{API_KEY_1}} constants and restores original values from AI-generated responses using local session keys.
+- **Visual Media Redactor**: Interactive HTML5 Canvas tool for Gaussian Blur, Pixelation, and Blackout redactions on images and screenshots.
+
+## Technical Guarantee
+100% of processing occurs client-side in browser RAM or local Node.js CLI processes. Zero telemetry, zero analytics tracking on user data, zero external API calls.
+
+## Developer CLI & MCP
+- Run standalone via NPX: `npx aiscrubber clean-watermarks <file>`, `npx aiscrubber scrub <file>`, `npx aiscrubber mask <prompt>`, `npx aiscrubber unmask <response> --key <key.json>`.
+- Official MCP Server package: `aiscrubber-mcp`.
+
+## Creator
+Built by Poorvith M P, student developer & founder based in Bengaluru, India.
+Website: https://poorvithmp.com
+GitHub: https://github.com/prvthmpcypher/aiscrubber

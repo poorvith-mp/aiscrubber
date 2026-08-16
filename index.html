@@ -3,22 +3,109 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AIScrubber — Next-Gen Browser-Local Privacy & Redaction Desk</title>
-    <meta name="description" content="Sanitize text, redact prompts with reversible constants, strip EXIF/GPS metadata, and blur sensitive media in 100% local browser memory. Built by Poorvith M P." />
+    
+    <!-- Primary SEO Meta Tags -->
+    <title>AIScrubber — Free Browser-Local Privacy Desk, C2PA Remover & AI Watermark Stripper</title>
+    <meta name="title" content="AIScrubber — Free Browser-Local Privacy Desk, C2PA Remover & AI Watermark Stripper" />
+    <meta name="description" content="100% Client-side privacy desk: strip C2PA Content Credentials, remove Claude invisible zero-width watermarks, scrub PII logs into tokens, mask AI prompts, and wipe EXIF/GPS metadata in local memory. Zero telemetry. Built by Poorvith M P." />
+    <meta name="keywords" content="c2pa remover, c2pa stripper, claude watermark remover, remove c2pa content credentials, ai watermark remover, zero telemetry privacy, sanitize logs, exif stripper, mask prompt for ai, chatgpt c2pa, dall-e c2pa, poorvith m p" />
+    <meta name="author" content="Poorvith M P" />
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
     <meta name="theme-color" content="#f8fafc" />
     <link rel="canonical" href="https://aiscrubber.poorvithmp.com/" />
+    
+    <!-- Icons -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/logo-mark.svg" />
+
+    <!-- Google Fonts Preconnect -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,600;1,700&family=Plus+Jakarta+Sans:ital,wght@0,400..800;1,400..800&display=swap" rel="stylesheet" />
+
+    <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="AIScrubber — Browser-Local Privacy & Redaction Desk" />
-    <meta property="og:description" content="Sanitize text, prompts, EXIF metadata, and visual media client-side." />
+    <meta property="og:site_name" content="AIScrubber" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:title" content="AIScrubber — Browser-Local Privacy Desk, C2PA Remover & AI Watermark Stripper" />
+    <meta property="og:description" content="Sanitize text, redact prompts with reversible constants, strip C2PA Content Credentials manifests, and remove Claude invisible watermarks in 100% local browser memory." />
     <meta property="og:url" content="https://aiscrubber.poorvithmp.com/" />
     <meta property="og:image" content="https://aiscrubber.poorvithmp.com/og.svg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="AIScrubber Privacy Desk Preview" />
+
+    <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@poorvithmp" />
     <meta name="twitter:creator" content="@poorvithmp" />
-    <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"AIScrubber","url":"https://aiscrubber.poorvithmp.com/","applicationCategory":"SecurityApplication","operatingSystem":"Any","description":"A browser-local privacy, prompt masking, and metadata sanitization desk.","author":{"@type":"Person","name":"Poorvith M P","url":"https://poorvithmp.com"}}</script>
+    <meta name="twitter:title" content="AIScrubber — Free Browser-Local Privacy Desk, C2PA Remover & AI Watermark Stripper" />
+    <meta name="twitter:description" content="Sanitize text, prompts, C2PA provenance, EXIF metadata, and visual media 100% client-side with zero server roundtrips." />
+    <meta name="twitter:image" content="https://aiscrubber.poorvithmp.com/og.svg" />
+
+    <!-- Schema.org SoftwareApplication JSON-LD -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebApplication",
+          "@id": "https://aiscrubber.poorvithmp.com/#app",
+          "name": "AIScrubber",
+          "url": "https://aiscrubber.poorvithmp.com/",
+          "applicationCategory": "SecurityApplication",
+          "operatingSystem": "All modern browsers (Chrome, Firefox, Safari, Edge)",
+          "browserRequirements": "Requires JavaScript. 100% Client-side.",
+          "description": "Zero-telemetry browser-local privacy desk and developer CLI to strip C2PA Content Credentials, remove Claude invisible zero-width watermarks, mask sensitive variables in AI prompts, scrub PII logs, and sanitize EXIF/GPS metadata.",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+          },
+          "author": {
+            "@type": "Person",
+            "name": "Poorvith M P",
+            "url": "https://poorvithmp.com",
+            "sameAs": [
+              "https://github.com/prvthmpcypher",
+              "https://x.com/poorvithmp",
+              "https://linkedin.com/in/poorvithmp"
+            ]
+          }
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://aiscrubber.poorvithmp.com/#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "How does AIScrubber strip C2PA Content Credentials?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "AIScrubber inspects the binary segments of JPEG (APP11 JUMBF boxes) and PNG (caPI and c2pa chunks) directly in local browser memory, wipes the cryptographic manifest fingerprints embedded by ChatGPT (DALL·E 3), Nano Banana, Adobe Firefly, or Google Imagen, and allows clean export or custom author signing."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Does AIScrubber send any of my text, logs, or photos to a server?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "No. AIScrubber operates with zero server roundtrips. All regex matching, HTML5 canvas redactions, binary EXIF modifications, and invisible watermark cleanings happen entirely inside ephemeral client-side memory."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How does the AI Text & Claude Watermark Remover work?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "It scans text for invisible Unicode zero-width characters (ZWSP, ZWNJ, ZWJ, BOM, Word Joiners), Unicode Tag-Plane steganography (U+E0001-U+E007F), variation selectors, non-standard spaces, confusable homoglyphs, and statistical AI cadence clichés, sanitizing text back to standard human format."
+              }
+            }
+          ]
+        }
+      ]
+    }
+    </script>
   </head>
   <body class="bg-[var(--bg)] text-[var(--text)] font-sans antialiased selection:bg-[var(--accent)] selection:text-[var(--accent-ink)]">
     <div id="root"></div>
