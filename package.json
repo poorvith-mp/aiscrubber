@@ -5,6 +5,40 @@
   "author": "Poorvith M P <https://poorvithmp.com>",
   "license": "MIT",
   "type": "module",
+  "homepage": "https://aiscrubber.poorvithmp.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/prvthmpcypher/aiscrubber.git"
+  },
+  "bugs": {
+    "url": "https://github.com/prvthmpcypher/aiscrubber/issues"
+  },
+  "keywords": [
+    "privacy",
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "claude",
+    "cursor",
+    "chatgpt",
+    "sanitizer",
+    "scrubber",
+    "zero-telemetry",
+    "watermark-remover",
+    "c2pa",
+    "exif",
+    "security",
+    "cli"
+  ],
+  "files": [
+    "bin",
+    "README.md",
+    "LICENSE",
+    "docs/assets/logo.svg"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "bin": {
     "aiscrubber": "./bin/aiscrubber.js",
     "aiscrubber-mcp": "./bin/aiscrubber-mcp.js"

@@ -75,6 +75,7 @@ Zero-telemetry privacy suite for developer prompts, crash logs, and files.
 \x1b[1mUSAGE\x1b[0m
   $ npx aiscrubber <command> [arguments] [options]
   $ npx aiscrubber help <command>
+  $ cat incident.log | npx aiscrubber scrub
 
 \x1b[1mCOMMANDS\x1b[0m
   \x1b[36mclean-watermarks\x1b[0m <file | text>  Strip Claude & AI invisible Unicode zero-width watermarks
@@ -83,6 +84,7 @@ Zero-telemetry privacy suite for developer prompts, crash logs, and files.
   \x1b[36munmask\x1b[0m <ai-file> --key <key>     Reconstruct original secrets back into returned AI output
   \x1b[36mstrip-metadata\x1b[0m <files...>         Strip EXIF, GPS, C2PA, and PDF/Audio metadata client-side
   \x1b[36minspect\x1b[0m <file | text>           Inspect hidden metadata, C2PA manifests, or text secrets
+  \x1b[36mmcp\x1b[0m, \x1b[36mserve\x1b[0m                        Start native stdio MCP server for Claude Desktop & Cursor
 
 \x1b[1mGLOBAL OPTIONS\x1b[0m
   -o, --output <path>            Write output to a specific file instead of stdout
@@ -98,6 +100,7 @@ Zero-telemetry privacy suite for developer prompts, crash logs, and files.
   $ npx aiscrubber help unmask
   $ npx aiscrubber help strip-metadata
   $ npx aiscrubber help inspect
+  $ npx aiscrubber help mcp
 `);
 }
 
@@ -112,6 +115,7 @@ non-standard whitespace, homoglyphs, and AI stylometric clichés from Claude & L
 
 \x1b[1mUSAGE\x1b[0m
   $ npx aiscrubber clean-watermarks <file | text> [options]
+  $ cat response.md | npx aiscrubber clean-watermarks
 
 \x1b[1mOPTIONS\x1b[0m
   -o, --output <path>    Write sanitized content to file
@@ -131,6 +135,7 @@ IP Addresses, Credit Cards, Customer/System IDs) and replaces them with numbered
 
 \x1b[1mUSAGE\x1b[0m
   $ npx aiscrubber scrub <file | text> [options]
+  $ cat server.log | npx aiscrubber scrub
 
 \x1b[1mOPTIONS\x1b[0m
   -o, --output <path>    Write scrubbed output to file
@@ -139,6 +144,28 @@ IP Addresses, Credit Cards, Customer/System IDs) and replaces them with numbered
 \x1b[1mEXAMPLES\x1b[0m
   $ npx aiscrubber scrub ./logs/production-crash.log -o ./logs/clean.log
   $ npx aiscrubber scrub "Contact alex@acme.com with key sk-live-998811223344"
+`);
+      break;
+
+    case 'mcp':
+    case 'serve':
+      console.log(`
+\x1b[1mCOMMAND: mcp (or serve)\x1b[0m
+Starts the native stdio JSON-RPC 2.0 Model Context Protocol (MCP) server.
+Integrates directly with Claude Desktop, Claude Code CLI, and Cursor.
+
+\x1b[1mUSAGE\x1b[0m
+  $ npx aiscrubber mcp
+
+\x1b[1mCLAUDE DESKTOP CONFIG\x1b[0m
+  {
+    "mcpServers": {
+      "aiscrubber": {
+        "command": "npx",
+        "args": ["-y", "aiscrubber", "mcp"]
+      }
+    }
+  }
 `);
       break;
 
@@ -409,6 +436,40 @@ function inspectContent(target) {
   };
 }
 
+async function resolveInput(target) {
+  if (target && target !== '-') {
+    if (fs.existsSync(target)) {
+      return fs.readFileSync(target, 'utf-8');
+    }
+    return target;
+  }
+
+  // Only read stdin if explicit '-' or no target provided AND stdin is not a TTY
+  if ((target === '-' || !target) && !process.stdin.isTTY) {
+    return new Promise((resolve) => {
+      let data = '';
+      let timer = setTimeout(() => {
+        resolve(data.length > 0 ? data : null);
+      }, 200);
+
+      process.stdin.setEncoding('utf-8');
+      process.stdin.on('data', (chunk) => {
+        data += chunk;
+      });
+      process.stdin.on('end', () => {
+        clearTimeout(timer);
+        resolve(data.length > 0 ? data : null);
+      });
+      process.stdin.on('error', () => {
+        clearTimeout(timer);
+        resolve(null);
+      });
+    });
+  }
+
+  return null;
+}
+
 // Main CLI Dispatcher
 async function run() {
   const args = process.argv.slice(2);
@@ -439,18 +500,21 @@ async function run() {
     return;
   }
 
+  // MCP SERVER SUBCOMMAND
+  if (command === 'mcp' || command === 'serve') {
+    await import('./aiscrubber-mcp.js');
+    return;
+  }
+
   // CLEAN-WATERMARKS
   if (command === 'clean-watermarks' || command === 'watermark') {
-    const target = args[1];
-    if (!target) {
-      console.error('\x1b[31mError:\x1b[0m Provide a text string or file path to clean watermarks.');
+    const target = args[1] && !args[1].startsWith('-') ? args[1] : null;
+    const inputContent = await resolveInput(target);
+
+    if (!inputContent) {
+      console.error('\x1b[31mError:\x1b[0m Provide a text string, file path, or pipe content into clean-watermarks.');
       console.error("Run 'npx aiscrubber help clean-watermarks' for usage.");
       process.exit(1);
-    }
-
-    let inputContent = target;
-    if (fs.existsSync(target)) {
-      inputContent = fs.readFileSync(target, 'utf-8');
     }
 
     const { cleaned, stats } = cleanWatermarks(inputContent);
@@ -470,16 +534,13 @@ async function run() {
 
   // SCRUB
   if (command === 'scrub') {
-    const target = args[1];
-    if (!target) {
-      console.error('\x1b[31mError:\x1b[0m Please provide a file path or text string to scrub.');
+    const target = args[1] && !args[1].startsWith('-') ? args[1] : null;
+    const inputContent = await resolveInput(target);
+
+    if (!inputContent) {
+      console.error('\x1b[31mError:\x1b[0m Please provide a file path, text string, or pipe content into scrub.');
       console.error("Run 'npx aiscrubber help scrub' for usage.");
       process.exit(1);
-    }
-
-    let inputContent = target;
-    if (fs.existsSync(target)) {
-      inputContent = fs.readFileSync(target, 'utf-8');
     }
 
     const { scrubbed, counts, totalReplaced } = scrubText(inputContent);
@@ -499,16 +560,13 @@ async function run() {
 
   // MASK
   if (command === 'mask') {
-    const target = args[1];
-    if (!target) {
-      console.error('\x1b[31mError:\x1b[0m Please provide a prompt or prompt file to mask.');
+    const target = args[1] && !args[1].startsWith('-') ? args[1] : null;
+    const promptContent = await resolveInput(target);
+
+    if (!promptContent) {
+      console.error('\x1b[31mError:\x1b[0m Please provide a prompt, prompt file, or pipe content into mask.');
       console.error("Run 'npx aiscrubber help mask' for usage.");
       process.exit(1);
-    }
-
-    let promptContent = target;
-    if (fs.existsSync(target)) {
-      promptContent = fs.readFileSync(target, 'utf-8');
     }
 
     const { masked, sessionKey } = maskPrompt(promptContent);
@@ -530,9 +588,9 @@ async function run() {
 
   // UNMASK
   if (command === 'unmask') {
-    const target = args[1];
+    const target = args[1] && !args[1].startsWith('-') ? args[1] : null;
     const keyIndex = args.findIndex((a) => a === '-k' || a === '--key');
-    if (!target || keyIndex === -1 || !args[keyIndex + 1]) {
+    if (keyIndex === -1 || !args[keyIndex + 1]) {
       console.error('\x1b[31mError:\x1b[0m unmask requires a target AI response file and a --key <session.aiscrub.json> path.');
       console.error("Run 'npx aiscrubber help unmask' for usage.");
       process.exit(1);
@@ -544,9 +602,10 @@ async function run() {
       process.exit(1);
     }
 
-    let aiContent = target;
-    if (fs.existsSync(target)) {
-      aiContent = fs.readFileSync(target, 'utf-8');
+    const aiContent = await resolveInput(target);
+    if (!aiContent) {
+      console.error('\x1b[31mError:\x1b[0m Provide AI response content or file path.');
+      process.exit(1);
     }
 
     const sessionKey = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
@@ -601,14 +660,16 @@ async function run() {
 
   // INSPECT
   if (command === 'inspect') {
-    const target = args[1];
-    if (!target) {
-      console.error('\x1b[31mError:\x1b[0m Provide a file path or text string to inspect.');
+    const target = args[1] && !args[1].startsWith('-') ? args[1] : null;
+    const inspectionTarget = await resolveInput(target);
+
+    if (!inspectionTarget) {
+      console.error('\x1b[31mError:\x1b[0m Provide a file path, text string, or pipe content to inspect.');
       console.error("Run 'npx aiscrubber help inspect' for usage.");
       process.exit(1);
     }
 
-    const inspection = inspectContent(target);
+    const inspection = inspectContent(inspectionTarget);
     if (args.includes('-j') || args.includes('--json')) {
       console.log(JSON.stringify(inspection, null, 2));
     } else {

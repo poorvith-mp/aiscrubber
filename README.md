@@ -106,7 +106,7 @@ Add the following to your `claude_desktop_config.json`:
   "mcpServers": {
     "aiscrubber": {
       "command": "npx",
-      "args": ["-y", "aiscrubber-mcp"]
+      "args": ["-y", "aiscrubber", "mcp"]
     }
   }
 }
@@ -117,6 +117,7 @@ Add the following to your `claude_desktop_config.json`:
 - `scrub_text`: Sanitizes raw logs and text into `[EMAIL_1]`, `[SECRET_1]`, `[IP_1]`.
 - `mask_prompt`: Masks secrets into `{{KEY_1}}` constants and outputs session key JSON.
 - `unmask_response`: Restores original variables back into returned AI output.
+- `inspect_content`: Scans text or files for leaked credentials, API tokens, invisible watermarks, and C2PA tracking manifests.
 
 ---
 

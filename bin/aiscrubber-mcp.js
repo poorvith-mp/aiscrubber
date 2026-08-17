@@ -206,6 +206,38 @@ function unmaskContent(aiResponse, sessionKey) {
   return { unmasked, restoredVariables: count };
 }
 
+function inspectContent(content) {
+  const threats = [];
+  const details = {};
+
+  if (content.includes('caPI') || content.includes('c2pa') || content.includes('jumb') || content.includes('\xFF\xEB')) {
+    threats.push('C2PA Content Credentials cryptographic manifest active');
+    details.c2pa = { hasManifest: true };
+    if (content.includes('OpenAI')) details.c2pa.signer = 'OpenAI Inc.';
+    if (content.includes('Nano Banana')) details.c2pa.signer = 'Nano Banana CA';
+    if (content.includes('Adobe')) details.c2pa.signer = 'Adobe Inc.';
+  }
+
+  for (const [k, d] of Object.entries(DETECTORS)) {
+    const m = content.match(d.regex);
+    if (m) {
+      threats.push(`${d.name} exposed (${m.length} instance${m.length > 1 ? 's' : ''})`);
+    }
+  }
+
+  const zw = content.match(/[\u200B\u200C\u200D\uFEFF\u2060\uDB40\uFE00-\uFE0F]|\\u(?:200[bcd]|feff|2060)/g);
+  if (zw) {
+    threats.push(`Invisible zero-width / Tag-Plane watermarks detected (${zw.length} instance${zw.length > 1 ? 's' : ''})`);
+  }
+
+  return {
+    sizeBytes: Buffer.byteLength(content, 'utf8'),
+    threatsFound: threats.length,
+    threats,
+    details,
+  };
+}
+
 const TOOLS = [
   {
     name: 'clean_ai_watermarks',
@@ -252,10 +284,26 @@ const TOOLS = [
       required: ['ai_response', 'session_key'],
     },
   },
+  {
+    name: 'inspect_content',
+    description: 'Inspect text or code for leaked API keys, tokens, PII, invisible watermarks, and C2PA provenance indicators.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'Raw text or code snippet to inspect' },
+      },
+      required: ['text'],
+    },
+  },
 ];
 
 function handleMessage(msg) {
   const { id, method, params } = msg;
+
+  // Handle notifications (no response should ever be sent)
+  if (id === undefined || (method && method.startsWith('notifications/')) || method === '$/cancelRequest') {
+    return null;
+  }
 
   if (method === 'initialize') {
     return {
@@ -265,6 +313,8 @@ function handleMessage(msg) {
         protocolVersion: '2024-11-05',
         capabilities: {
           tools: {},
+          resources: {},
+          prompts: {},
         },
         serverInfo: {
           name: SERVER_NAME,
@@ -281,6 +331,34 @@ function handleMessage(msg) {
       result: {
         tools: TOOLS,
       },
+    };
+  }
+
+  if (method === 'resources/list') {
+    return {
+      jsonrpc: '2.0',
+      id,
+      result: {
+        resources: [],
+      },
+    };
+  }
+
+  if (method === 'prompts/list') {
+    return {
+      jsonrpc: '2.0',
+      id,
+      result: {
+        prompts: [],
+      },
+    };
+  }
+
+  if (method === 'logging/setLevel') {
+    return {
+      jsonrpc: '2.0',
+      id,
+      result: {},
     };
   }
 
@@ -351,6 +429,22 @@ function handleMessage(msg) {
       };
     }
 
+    if (name === 'inspect_content') {
+      const result = inspectContent(args?.text || '');
+      return {
+        jsonrpc: '2.0',
+        id,
+        result: {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        },
+      };
+    }
+
     return {
       jsonrpc: '2.0',
       id,
@@ -369,6 +463,10 @@ function handleMessage(msg) {
   };
 }
 
+if (process.stderr.isTTY) {
+  process.stderr.write(`\x1b[32m[aiscrubber-mcp]\x1b[0m Server v${SERVER_VERSION} running on stdio.\n`);
+}
+
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
@@ -380,7 +478,7 @@ rl.on('line', (line) => {
   try {
     const parsed = JSON.parse(line);
     const response = handleMessage(parsed);
-    if (response) {
+    if (response && parsed.id !== undefined) {
       process.stdout.write(JSON.stringify(response) + '\n');
     }
   } catch (err) {
