@@ -19,7 +19,7 @@ Before submitting a Pull Request, keep our core constraints in mind:
 
 ```bash
 # Clone the repository
-git clone https://github.com/prvthmpcypher/aiscrubber.git
+git clone https://github.com/poorvith-mp/aiscrubber.git
 cd aiscrubber
 
 # Install dependencies
@@ -58,4 +58,4 @@ node ./bin/aiscrubber-mcp.js
 
 ## 4. Questions & Feedback
 
-Reach out on [GitHub Discussions](https://github.com/prvthmpcypher/aiscrubber/discussions) or connect with Poorvith on X ([@poorvithmp](https://x.com/poorvithmp)) and portfolio ([poorvithmp.com](https://poorvithmp.com)).
+Reach out on [GitHub Discussions](https://github.com/poorvith-mp/aiscrubber/discussions) or connect with Poorvith on X ([@poorvithmp](https://x.com/poorvithmp)) and portfolio ([poorvithmp.com](https://poorvithmp.com)).

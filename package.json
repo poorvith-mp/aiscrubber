@@ -8,10 +8,10 @@
   "homepage": "https://aiscrubber.poorvithmp.com",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/prvthmpcypher/aiscrubber.git"
+    "url": "git+https://github.com/poorvith-mp/aiscrubber.git"
   },
   "bugs": {
-    "url": "https://github.com/prvthmpcypher/aiscrubber/issues"
+    "url": "https://github.com/poorvith-mp/aiscrubber/issues"
   },
   "keywords": [
     "privacy",

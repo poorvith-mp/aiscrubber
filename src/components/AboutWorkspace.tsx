@@ -125,7 +125,7 @@ export function AboutWorkspace() {
             </a>
 
             <a
-              href="https://github.com/prvthmpcypher"
+              href="https://github.com/poorvith-mp"
               target="_blank"
               rel="noreferrer"
               className="btn-secondary text-xs flex items-center gap-1.5"

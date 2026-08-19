@@ -19,4 +19,4 @@
 ## Creator
 Built by Poorvith M P, student developer & founder based in Bengaluru, India.
 Website: https://poorvithmp.com
-GitHub: https://github.com/prvthmpcypher/aiscrubber
+GitHub: https://github.com/poorvith-mp/aiscrubber

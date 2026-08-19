@@ -137,7 +137,7 @@ Add the following to your `claude_desktop_config.json`:
 Designed and built by **[Poorvith M P](https://poorvithmp.com)**, 19-year-old student developer & founder based in Bengaluru, India.
 
 - **Portfolio**: [poorvithmp.com](https://poorvithmp.com)
-- **GitHub**: [@prvthmpcypher](https://github.com/prvthmpcypher)
+- **GitHub**: [@poorvith-mp](https://github.com/poorvith-mp)
 - **X (Twitter)**: [@poorvithmp](https://x.com/poorvithmp)
 - **LinkedIn**: [linkedin.com/in/poorvithmp](https://linkedin.com/in/poorvithmp)
 

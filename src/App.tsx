@@ -145,7 +145,7 @@ export function App() {
   useEffect(() => {
     async function fetchStars() {
       try {
-        const res = await fetch('https://api.github.com/repos/prvthmpcypher/aiscrubber');
+        const res = await fetch('https://api.github.com/repos/poorvith-mp/aiscrubber');
         if (res.ok) {
           const data = await res.json();
           if (typeof data.stargazers_count === 'number') {
@@ -286,7 +286,7 @@ export function App() {
 
           {/* GitHub Star Live Count Badge */}
           <a
-            href="https://github.com/prvthmpcypher/aiscrubber"
+            href="https://github.com/poorvith-mp/aiscrubber"
             target="_blank"
             rel="noreferrer"
             className="github-star-pill"
@@ -459,7 +459,7 @@ export function App() {
               Feedback
             </button>
             <a
-              href="https://github.com/prvthmpcypher/aiscrubber"
+              href="https://github.com/poorvith-mp/aiscrubber"
               target="_blank"
               rel="noreferrer"
               className="hover:text-[var(--text)]"
