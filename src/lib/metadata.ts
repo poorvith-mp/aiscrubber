@@ -623,7 +623,7 @@ export async function applyMetadataEdits(
       }
 
       const authorName = edits.Author || edits.c2paSigner || 'Poorvith M P';
-      const softwareName = edits.Software || edits.c2paGenerator || 'AIScrubber Privacy Suite v2.2.0';
+      const softwareName = edits.Software || edits.c2paGenerator || 'AIScrubber Privacy Suite v2.3.0';
       const titleName = edits.Title || edits.c2paPrompt || file.name.replace(/\.[^/.]+$/, '');
       const copyrightName = edits.Copyright || 'CC-BY 4.0 / All Rights Reserved';
 
@@ -700,7 +700,7 @@ export async function applyMetadataEdits(
         const chunksToInsert: Uint8Array[] = [];
 
         const authorName = edits.Author || edits.c2paSigner || 'Poorvith M P';
-        const softwareName = edits.Software || edits.c2paGenerator || 'AIScrubber Privacy Suite v2.2.0';
+        const softwareName = edits.Software || edits.c2paGenerator || 'AIScrubber Privacy Suite v2.3.0';
         const titleName = edits.Title || edits.c2paPrompt || file.name.replace(/\.[^/.]+$/, '');
         const copyrightName = edits.Copyright || 'CC-BY 4.0 / All Rights Reserved';
 
@@ -792,7 +792,13 @@ export async function stripMetadataUniversal(file: File): Promise<Blob> {
     }
   }
 
-  // 2. Strip PNG metadata by re-encoding clean canvas buffer
+  // 2. Strip PNG metadata chunks without decoding or recompressing pixels.
+  if (mimeType === 'image/png' || file.name.match(/\.png$/i)) {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    return new Blob([stripPngMetadataChunks(bytes) as unknown as BlobPart], { type: 'image/png' });
+  }
+
+  // 3. Strip other image metadata by re-encoding a clean canvas buffer
   if (file.type.startsWith('image/')) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -822,7 +828,7 @@ export async function stripMetadataUniversal(file: File): Promise<Blob> {
     });
   }
 
-  // 3. Strip PDF Metadata
+  // 4. Strip PDF Metadata
   if (mimeType === 'application/pdf' || file.name.endsWith('.pdf')) {
     const buffer = await file.arrayBuffer();
     let text = new TextDecoder('latin1').decode(buffer);

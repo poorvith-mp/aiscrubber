@@ -1,3 +1,5 @@
+import { scrubBuiltIns } from './scrubCore.js';
+
 export type EnhancementGoal = 'coding' | 'debugging' | 'analysis' | 'writing' | 'general';
 
 export interface PromptVariable {
@@ -29,15 +31,6 @@ export interface ReconstructResult {
   unresolvedPlaceholders: string[];
 }
 
-const SECRET_PATTERNS = [
-  { category: 'secret' as const, token: 'API_SECRET', regex: /\b(?:sk-[A-Za-z0-9_-]{12,}|ghp_[A-Za-z0-9]{36}|gho_[A-Za-z0-9]{36}|xox[baprs]-[A-Za-z0-9-]{10,}|bearer\s+[A-Za-z0-9._~+/-]{12,}|AKIA[0-9A-Z]{16}|ey[A-Za-z0-9_-]{10,}\.[A-Za-z0-9._-]{10,}\.[A-Za-z0-9._-]{10,})\b/gi },
-  { category: 'email' as const, token: 'EMAIL_ADDR', regex: /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi },
-  { category: 'url' as const, token: 'INTERNAL_URL', regex: /\bhttps?:\/\/[^\s<>()"']+/gi },
-  { category: 'ip' as const, token: 'HOST_IP', regex: /\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b/g },
-  { category: 'credential' as const, token: 'CREDENTIAL', regex: /\b(?:password|passwd|pwd|secret|api_key|token|auth_key)\s*[:=]\s*["']?([^\s"';,]+)["']?/gi },
-  { category: 'id' as const, token: 'ENTITY_ID', regex: /\b(?:CUST|USER|ACCOUNT|ORDER|CLIENT|INVOICE|EMP|ORG)[-_][A-Z0-9]{4,}\b/gi },
-];
-
 export function enhanceAndMaskPrompt(
   rawPrompt: string,
   goal: EnhancementGoal = 'coding',
@@ -45,7 +38,6 @@ export function enhanceAndMaskPrompt(
 ): PromptEnhanceResult {
   let maskedText = rawPrompt;
   const variables: PromptVariable[] = [];
-  const sequence: Record<string, number> = {};
 
   // Custom user variables first
   for (const item of customVariables) {
@@ -59,32 +51,16 @@ export function enhanceAndMaskPrompt(
     });
   }
 
-  // Built-in detector replacements
-  for (const pattern of SECRET_PATTERNS) {
-    pattern.regex.lastIndex = 0;
-    const matches = Array.from(maskedText.matchAll(pattern.regex));
-    for (const match of matches) {
-      const matchedValue = match[1] || match[0];
-      if (!matchedValue || matchedValue.length < 3) continue;
-
-      const existing = variables.find(
-        (v) => v.original.toLowerCase() === matchedValue.toLowerCase()
-      );
-      let placeholder = existing?.placeholder;
-
-      if (!placeholder) {
-        const next = (sequence[pattern.token] ?? 0) + 1;
-        sequence[pattern.token] = next;
-        placeholder = `{{${pattern.token}_${next}}}`;
-        variables.push({
-          placeholder,
-          original: matchedValue,
-          category: pattern.category,
-        });
-      }
-
-      maskedText = maskedText.split(matchedValue).join(placeholder);
-    }
+  // Built-in replacements share the browser, CLI, and MCP engine.
+  const scrubbed = scrubBuiltIns(maskedText);
+  for (const mapping of scrubbed.mappings) {
+    const placeholder = mapping.token.replace('[', '{{').replace(']', '}}');
+    maskedText = maskedText.split(mapping.original).join(placeholder);
+    variables.push({
+      placeholder,
+      original: mapping.original,
+      category: categoryForDetector(mapping.detectorId),
+    });
   }
 
   // Apply prompt engineering enhancements based on selected goal
@@ -105,6 +81,14 @@ export function enhanceAndMaskPrompt(
     sessionKey,
     variablesFound: variables.length,
   };
+}
+
+function categoryForDetector(detectorId: string): PromptVariable['category'] {
+  if (detectorId === 'email') return 'email';
+  if (detectorId === 'url') return 'url';
+  if (detectorId === 'ip') return 'ip';
+  if (detectorId === 'identifier' || detectorId === 'ssn_dob' || detectorId === 'national_id_in') return 'id';
+  return 'secret';
 }
 
 function formatEnhancedPrompt(body: string, goal: EnhancementGoal): string {

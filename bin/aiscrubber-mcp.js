@@ -7,42 +7,10 @@
  */
 
 import readline from 'node:readline';
+import { detectorDefinitions, scrubBuiltIns } from '../src/lib/scrubCore.js';
 
 const SERVER_NAME = 'aiscrubber-mcp';
-const SERVER_VERSION = '2.2.0';
-
-const DETECTORS = {
-  email: {
-    name: 'Email Addresses',
-    regex: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g,
-    tokenPrefix: 'EMAIL',
-  },
-  apiKey: {
-    name: 'API Keys & Secrets',
-    regex: /\b(?:sk-[A-Za-z0-9_-]{16,}|ghp_[A-Za-z0-9]{36}|gho_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{40,}|AKIA[0-9A-Z]{16}|bearer\s+[A-Za-z0-9\-._~+/]+=*|eyJ[A-Za-z0-9-_=]+\.eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_.+/=]*)\b/gi,
-    tokenPrefix: 'SECRET',
-  },
-  ipv4: {
-    name: 'IPv4 Addresses',
-    regex: /\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b/g,
-    tokenPrefix: 'IP',
-  },
-  phone: {
-    name: 'Phone Numbers',
-    regex: /(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g,
-    tokenPrefix: 'PHONE',
-  },
-  card: {
-    name: 'Payment Cards',
-    regex: /\b(?:\d{4}[-\s]?){3}\d{4}\b|\b\d{15,16}\b/g,
-    tokenPrefix: 'CARD',
-  },
-  systemId: {
-    name: 'System & Customer IDs',
-    regex: /\b(?:CUST|USER|ORDER|TX|ACCOUNT|INV|SUB)-[A-Za-z0-9_-]{4,20}\b/gi,
-    tokenPrefix: 'ID',
-  },
-};
+const SERVER_VERSION = '2.3.0';
 
 const HOMOGLYPH_MAP = {
   'а': 'a', 'А': 'A', 'с': 'c', 'С': 'C', 'е': 'e', 'Е': 'E', 'о': 'o', 'О': 'O',
@@ -127,64 +95,26 @@ function cleanWatermarkContent(text) {
 }
 
 function scrubContent(text) {
-  let scrubbed = text;
-  const mappings = {};
-  let totalReplaced = 0;
-
-  for (const [key, detector] of Object.entries(DETECTORS)) {
-    const matches = Array.from(text.matchAll(detector.regex));
-    let counter = 1;
-    for (const match of matches) {
-      const raw = match[0];
-      if (!mappings[raw]) {
-        const token = `[${detector.tokenPrefix}_${counter}]`;
-        mappings[raw] = token;
-        counter++;
-      }
-    }
-  }
-
-  for (const [raw, token] of Object.entries(mappings)) {
-    const escaped = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(escaped, 'g');
-    const count = (scrubbed.match(regex) || []).length;
-    if (count > 0) {
-      scrubbed = scrubbed.replace(regex, token);
-      totalReplaced += count;
-    }
-  }
-
-  return { scrubbed, mappings, totalReplaced };
+  const result = scrubBuiltIns(text);
+  return {
+    scrubbed: result.text,
+    mappings: Object.fromEntries(result.mappings.map(({ original, token }) => [original, token])),
+    totalReplaced: result.totalRedactions,
+  };
 }
 
 function maskPromptContent(prompt) {
-  let masked = prompt;
-  const variables = {};
-  let counter = 1;
-
-  for (const [key, detector] of Object.entries(DETECTORS)) {
-    const matches = Array.from(prompt.matchAll(detector.regex));
-    for (const match of matches) {
-      const raw = match[0];
-      if (!variables[raw]) {
-        const placeholder = `{{${detector.tokenPrefix}_${counter}}}`;
-        variables[raw] = placeholder;
-        counter++;
-      }
-    }
-  }
-
+  const scrubbed = scrubBuiltIns(prompt);
+  let masked = scrubbed.text;
   const sessionKey = {
     id: `aiscrub_${Date.now()}`,
     variables: {},
   };
-
-  for (const [raw, placeholder] of Object.entries(variables)) {
-    const escaped = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    masked = masked.replace(new RegExp(escaped, 'g'), placeholder);
-    sessionKey.variables[placeholder] = raw;
+  for (const { token, original } of scrubbed.mappings) {
+    const placeholder = token.replace('[', '{{').replace(']', '}}');
+    masked = masked.split(token).join(placeholder);
+    sessionKey.variables[placeholder] = original;
   }
-
   return { masked, sessionKey };
 }
 
@@ -218,11 +148,10 @@ function inspectContent(content) {
     if (content.includes('Adobe')) details.c2pa.signer = 'Adobe Inc.';
   }
 
-  for (const [k, d] of Object.entries(DETECTORS)) {
-    const m = content.match(d.regex);
-    if (m) {
-      threats.push(`${d.name} exposed (${m.length} instance${m.length > 1 ? 's' : ''})`);
-    }
+  const scrubbed = scrubBuiltIns(content);
+  for (const detector of detectorDefinitions) {
+    const count = scrubbed.counts[detector.id] || 0;
+    if (count) threats.push(`${detector.label} exposed (${count} instance${count > 1 ? 's' : ''})`);
   }
 
   const zw = content.match(/[\u200B\u200C\u200D\uFEFF\u2060\uDB40\uFE00-\uFE0F]|\\u(?:200[bcd]|feff|2060)/g);
