@@ -105,7 +105,7 @@ export function WatermarkWorkspace() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-[var(--line)]">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="badge-emerald">AI Watermark Engine v2.2</span>
+            <span className="badge-emerald">AI Watermark Engine v2.3</span>
             <span className="text-xs text-[var(--muted)] font-mono">
               Claude · Tag Plane · Zero-Width · Stylometry
             </span>

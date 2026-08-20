@@ -70,10 +70,10 @@ export function LegalWorkspace() {
           <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 space-y-1">
             <h3 className="font-bold text-sm flex items-center gap-2">
               <Lock size={16} />
-              The Zero-Data Collection Guarantee
+              The Local Content Processing Guarantee
             </h3>
             <p className="text-xs text-emerald-200/90">
-              AIScrubber does not possess a backend application server. Your input text, logs, photos, and documents never leave your browser window.
+              AIScrubber does not upload your input text, logs, photos, documents, redaction boxes, or token mappings. Those stay in your browser window.
             </p>
           </div>
 
@@ -85,9 +85,9 @@ export function LegalWorkspace() {
           </section>
 
           <section className="space-y-3">
-            <h4 className="font-bold text-base text-[var(--text)]">2. Zero Sensitive Telemetry</h4>
+            <h4 className="font-bold text-base text-[var(--text)]">2. Sensitive Content and Site Analytics</h4>
             <p>
-              We do not track, log, intercept, or transmit any user-provided content. We do not store sensitive drafts in cookies or external databases. If you refresh or close the browser tab, all in-memory drafts and keys are wiped instantly.
+              We do not track, log, intercept, or transmit user-provided content, and we do not store sensitive drafts in cookies or external databases. The site uses Vercel Analytics for non-content page-visit measurements and requests the repository's public GitHub star count. Those requests do not include pasted text, uploaded files, redaction data, or session keys.
             </p>
           </section>
 

@@ -80,7 +80,7 @@ export function MetadataWorkspace() {
   const [bulkFields, setBulkFields] = useState({
     Author: 'Poorvith M P',
     Title: '',
-    Software: 'AIScrubber Privacy Suite v2.2.0',
+    Software: 'AIScrubber Privacy Suite v2.3.0',
     Copyright: 'CC-BY 4.0 / All Rights Reserved',
     c2paSigner: 'Poorvith M P',
     c2paGenerator: 'AIScrubber Privacy Suite',
@@ -153,7 +153,7 @@ export function MetadataWorkspace() {
 
     const initialAuthor = authorField?.value || parsed.c2pa?.signer || 'Poorvith M P';
     const initialTitle = titleField?.value || parsed.c2pa?.aiPrompt || '';
-    const initialSoftware = softwareField?.value || parsed.c2pa?.generator || 'AIScrubber Suite v2.2.0';
+    const initialSoftware = softwareField?.value || parsed.c2pa?.generator || 'AIScrubber Suite v2.3.0';
     const initialCopyright = copyField?.value || 'CC-BY 4.0 / All Rights Reserved';
 
     setEditFields({

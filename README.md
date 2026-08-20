@@ -18,14 +18,15 @@
 
 **AIScrubber** is an offline-capable, browser-local privacy desk and developer toolkit engineered for the exact moment before sensitive data travels to AI frontier models (ChatGPT, Claude, Gemini), public GitHub issues, or email threads.
 
-Everything runs **100% in local memory**—zero telemetry, zero server roundtrips, zero external database logging.
+All user-provided content is processed in local memory and is never uploaded to AIScrubber. The website uses privacy-respecting page analytics and fetches the public GitHub star count; neither request contains text, prompts, files, or redaction data.
 
 ---
 
 ## ✨ 5 Dedicated Privacy Engines
 
 ### 1. 📝 Text Scrubber
-- Scans input text and incident logs against **8 built-in detector classes** (Emails, API Keys & Bearer Tokens, IPv4/IPv6, Phone Numbers, Payment Cards, Customer/System IDs, SSN).
+- Scans input text and incident logs against **9 built-in detector classes**: email, phone, validated IPv4/IPv6, URLs, Luhn-valid payment cards, provider credentials, system IDs, US SSNs, and Verhoeff-valid Aadhaar/PAN formats.
+- Recognizes OpenAI, GitHub, Stripe, Google, GitLab, SendGrid, npm, Slack, AWS, JWT, bearer-token, and private-key credential shapes without matching split-line fragments.
 - Supports **Custom Keyword & Regex Rules** drawer.
 - Interactive side-by-side **Diff Inspector** with token tooltips.
 - 1-Click **Dictionary Key Export** for reversible token tracking.
@@ -126,7 +127,8 @@ Add the following to your `claude_desktop_config.json`:
 | Characteristic | Specification |
 |---|---|
 | **Execution Environment** | Client-Side Browser Memory / Local Node.js Process |
-| **Server Roundtrips** | **0** (Verified in DevTools Network tab) |
+| **Sensitive Content Uploads** | **0** — processing stays in browser memory or the local Node.js process |
+| **Non-content Requests** | Page analytics and the public GitHub star count; no pasted text, files, mappings, or keys |
 | **Storage** | Ephemeral RAM only (LocalStorage used only for dark/light UI preference) |
 | **License** | Open Source MIT License |
 
