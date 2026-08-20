@@ -37,37 +37,19 @@ import { PageLoader } from './components/PageLoader';
 import { PromptEnhancerWorkspace } from './components/PromptEnhancerWorkspace';
 import { ScrubberWorkspace } from './components/ScrubberWorkspace';
 import { WatermarkWorkspace } from './components/WatermarkWorkspace';
+import { NAV_GROUPS, viewForShortcut, viewFromHash, type ToolView } from './lib/navigation';
 
-export type ToolView =
-  | 'home'
-  | 'scrub'
-  | 'prompt'
-  | 'watermark'
-  | 'metadata'
-  | 'media'
-  | 'docs'
-  | 'legal'
-  | 'about';
-
-interface NavItem {
-  id: ToolView;
-  label: string;
-  category?: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
-  shortcut?: string;
-}
-
-const NAV_ITEMS: NavItem[] = [
-  { id: 'home', label: 'Home Landing', icon: Home, shortcut: 'H' },
-  { id: 'scrub', label: 'Text Scrubber', category: 'Engine 1', icon: FileCode2, shortcut: '1' },
-  { id: 'prompt', label: 'Prompt Masker', category: 'Engine 2', icon: Bot, shortcut: '2' },
-  { id: 'watermark', label: 'AI Watermark Remover', category: 'Engine 3', icon: Sparkles, shortcut: '3' },
-  { id: 'metadata', label: 'Metadata & C2PA Desk', category: 'Engine 4', icon: FileSpreadsheet, shortcut: '4' },
-  { id: 'media', label: 'Visual Media Redactor', category: 'Engine 5', icon: ImageIcon, shortcut: '5' },
-  { id: 'docs', label: 'Documentation & CLI', icon: BookOpen, shortcut: 'D' },
-  { id: 'legal', label: 'Privacy & Terms', icon: Scale, shortcut: 'L' },
-  { id: 'about', label: 'About & Founder', icon: User, shortcut: 'A' },
-];
+const NAV_ICONS: Record<ToolView, React.ComponentType<{ size?: number; className?: string }>> = {
+  home: Home,
+  scrub: FileCode2,
+  prompt: Bot,
+  watermark: Sparkles,
+  metadata: FileSpreadsheet,
+  media: ImageIcon,
+  docs: BookOpen,
+  legal: Scale,
+  about: User,
+};
 
 function OriginalLogo({ className = 'w-7 h-7' }: { className?: string }) {
   return (
@@ -163,22 +145,7 @@ export function App() {
   // Sync hash routing
   useEffect(() => {
     function handleHashChange() {
-      const hash = window.location.hash.replace('#', '') as ToolView;
-      if (
-        [
-          'home',
-          'scrub',
-          'prompt',
-          'watermark',
-          'metadata',
-          'media',
-          'docs',
-          'legal',
-          'about',
-        ].includes(hash)
-      ) {
-        setCurrentView(hash);
-      }
+      setCurrentView(viewFromHash(window.location.hash));
     }
 
     if (window.location.hash) {
@@ -187,6 +154,19 @@ export function App() {
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
+
+  useEffect(() => {
+    function handleShortcut(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const isEditable = Boolean(target?.isContentEditable || target?.closest('input, textarea, select, [contenteditable="true"]'));
+      const view = viewForShortcut(event.key, isEditable);
+      if (!view) return;
+      event.preventDefault();
+      switchView(view);
+    }
+    window.addEventListener('keydown', handleShortcut);
+    return () => window.removeEventListener('keydown', handleShortcut);
+  }, [currentView]);
 
   function switchView(view: ToolView) {
     if (view === currentView) return;
@@ -208,46 +188,39 @@ export function App() {
         aria-label="Workspace Navigation"
         className="hidden md:flex fixed left-4 top-1/2 -translate-y-1/2 z-40 flex-col items-center gap-1.5 p-2 rounded-2xl bg-[var(--panel)] border border-[var(--line)] shadow-2xl backdrop-blur-xl transition-all duration-300"
       >
-        {NAV_ITEMS.map((item, idx) => {
-          const Icon = item.icon;
-          const isActive = currentView === item.id;
-          const isDivider = idx === 6; // Divider before Docs/Legal/About
-
-          return (
-            <div key={item.id} className="w-full flex flex-col items-center">
-              {isDivider && (
-                <div className="w-6 h-px bg-[var(--line)] my-1.5" />
-              )}
-              <div className="group relative flex items-center justify-center">
-                <button
-                  type="button"
-                  onClick={() => switchView(item.id)}
-                  aria-label={item.label}
-                  className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 relative ${
-                    isActive
-                      ? 'bg-[var(--accent)] text-[var(--accent-ink)] shadow-md font-bold scale-105'
-                      : 'text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-sunken)]'
-                  }`}
-                >
-                  <Icon size={19} />
-                  {isActive && (
-                    <span className="absolute -left-1 top-1/2 -translate-y-1/2 w-1 h-4 bg-[var(--accent)] rounded-r-full" />
-                  )}
-                </button>
-
-                {/* Floating Tooltip to the Right */}
-                <div className="absolute left-14 px-3 py-1.5 rounded-xl bg-[var(--text)] text-[var(--bg)] text-xs font-bold whitespace-nowrap opacity-0 pointer-events-none translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 shadow-xl z-50 flex items-center gap-2">
-                  <span>{item.label}</span>
-                  {item.category && (
-                    <span className="text-[10px] opacity-75 font-mono">
-                      · {item.category}
-                    </span>
-                  )}
+        {NAV_GROUPS.map((group, groupIndex) => (
+          <div key={group.id} className="w-full flex flex-col items-center gap-1.5">
+            {groupIndex > 0 && <div className="w-6 h-px bg-[var(--line)] my-1" />}
+            <span className="sr-only">{group.label}</span>
+            {group.items.map((item) => {
+              const Icon = NAV_ICONS[item.id];
+              const isActive = currentView === item.id;
+              return (
+                <div key={item.id} className="group relative flex items-center justify-center">
+                  <button
+                    type="button"
+                    onClick={() => switchView(item.id)}
+                    aria-label={item.label}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 relative ${
+                      isActive
+                        ? 'bg-[var(--accent)] text-[var(--accent-ink)] shadow-md font-bold scale-105'
+                        : 'text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-sunken)]'
+                    }`}
+                  >
+                    <Icon size={19} />
+                  </button>
+                  <div className="absolute left-14 min-w-56 px-3 py-2 rounded-xl bg-[var(--text)] text-[var(--bg)] opacity-0 pointer-events-none translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 shadow-xl z-50">
+                    <div className="flex items-center justify-between gap-4 text-xs font-bold">
+                      <span>{item.label}</span><kbd className="font-mono opacity-70">{item.shortcut}</kbd>
+                    </div>
+                    <p className="mt-1 text-[10px] leading-4 opacity-75">{item.description}</p>
+                  </div>
                 </div>
-              </div>
-            </div>
-          );
-        })}
+              );
+            })}
+          </div>
+        ))}
       </aside>
 
       {/* Top Header */}
@@ -340,36 +313,38 @@ export function App() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {NAV_ITEMS.map((item) => {
-                const Icon = item.icon;
-                const isActive = currentView === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => switchView(item.id)}
-                    className={`p-3 rounded-xl flex items-center gap-3 transition-all text-left ${
-                      isActive
-                        ? 'bg-[var(--accent)] text-[var(--accent-ink)] font-bold shadow-md'
-                        : 'bg-[var(--surface-sunken)] text-[var(--text)] hover:border-[var(--accent)] border border-[var(--line)]'
-                    }`}
-                  >
-                    <div className={`p-2 rounded-lg ${isActive ? 'bg-black/10' : 'bg-[var(--panel)] text-[var(--accent)]'}`}>
-                      <Icon size={18} />
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-xs font-bold">{item.label}</span>
-                      {item.category && (
-                        <span className={`text-[10px] font-mono ${isActive ? 'opacity-80' : 'text-[var(--muted)]'}`}>
-                          {item.category}
+            {NAV_GROUPS.map((group) => (
+              <section key={group.id} aria-labelledby={`mobile-nav-${group.id}`}>
+                <h2 id={`mobile-nav-${group.id}`} className="mb-2 text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--muted)]">{group.label}</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {group.items.map((item) => {
+                    const Icon = NAV_ICONS[item.id];
+                    const isActive = currentView === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => switchView(item.id)}
+                        aria-current={isActive ? 'page' : undefined}
+                        className={`p-3 rounded-xl flex items-center gap-3 transition-all text-left ${
+                          isActive
+                            ? 'bg-[var(--accent)] text-[var(--accent-ink)] font-bold shadow-md'
+                            : 'bg-[var(--surface-sunken)] text-[var(--text)] hover:border-[var(--accent)] border border-[var(--line)]'
+                        }`}
+                      >
+                        <div className={`p-2 rounded-lg ${isActive ? 'bg-black/10' : 'bg-[var(--panel)] text-[var(--accent)]'}`}>
+                          <Icon size={18} />
+                        </div>
+                        <span className="flex flex-col">
+                          <span className="text-xs font-bold">{item.label}</span>
+                          <span className={`text-[10px] leading-4 ${isActive ? 'opacity-80' : 'text-[var(--muted)]'}`}>{item.description}</span>
                         </span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
           </div>
         </div>
       )}

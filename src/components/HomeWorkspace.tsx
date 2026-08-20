@@ -16,7 +16,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import type { ToolView } from '../App';
+import type { ToolView } from '../lib/navigation';
 
 interface HomeWorkspaceProps {
   onSelectTool: (tool: ToolView) => void;
@@ -145,7 +145,7 @@ Contact Customer: [EMAIL_1] (Card: [CARD_1])`;
         <div className="flex items-center justify-center gap-6 text-xs text-[var(--muted)] pt-2 flex-wrap font-mono">
           <span className="flex items-center gap-1.5">
             <CheckCircle2 size={14} className="text-[var(--accent)]" />
-            0 Network Uploads
+            Processing Stays Local
           </span>
           <span className="flex items-center gap-1.5">
             <CheckCircle2 size={14} className="text-[var(--accent)]" />
@@ -247,12 +247,12 @@ Contact Customer: [EMAIL_1] (Card: [CARD_1])`;
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold font-headline text-[var(--text)]">
-                  1. Text Scrubber
+                  Text Scrubber
                 </h3>
                 <ArrowRight size={16} className="text-[var(--muted)] group-hover:text-[var(--accent)] group-hover:translate-x-1 transition-all" />
               </div>
               <p className="text-xs text-[var(--muted)] leading-relaxed">
-                Scan logs, emails, and source code against 8 built-in detectors + custom regex rules. Side-by-side diff inspector with token dictionary export.
+                Scan logs, emails, and source code against 9 built-in detector classes plus custom rules. Review a tokenized diff before sharing.
               </p>
             </div>
           </div>
@@ -268,7 +268,7 @@ Contact Customer: [EMAIL_1] (Card: [CARD_1])`;
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold font-headline text-[var(--text)]">
-                  2. Prompt Enhancer
+                  Prompt Enhancer
                 </h3>
                 <ArrowRight size={16} className="text-[var(--muted)] group-hover:text-[var(--accent)] group-hover:translate-x-1 transition-all" />
               </div>
@@ -292,7 +292,7 @@ Contact Customer: [EMAIL_1] (Card: [CARD_1])`;
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold font-headline text-[var(--text)]">
-                  3. AI Watermark Remover
+                  AI Watermark Remover
                 </h3>
                 <ArrowRight size={16} className="text-[var(--accent)] group-hover:translate-x-1 transition-all" />
               </div>
@@ -313,7 +313,7 @@ Contact Customer: [EMAIL_1] (Card: [CARD_1])`;
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold font-headline text-[var(--text)]">
-                  4. Metadata & C2PA Desk
+                  Metadata & C2PA Desk
                 </h3>
                 <ArrowRight size={16} className="text-[var(--muted)] group-hover:text-[var(--accent)] group-hover:translate-x-1 transition-all" />
               </div>
@@ -334,7 +334,7 @@ Contact Customer: [EMAIL_1] (Card: [CARD_1])`;
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold font-headline text-[var(--text)]">
-                  5. Visual Media Redactor
+                  Visual Media Redactor
                 </h3>
                 <ArrowRight size={16} className="text-[var(--muted)] group-hover:text-[var(--accent)] group-hover:translate-x-1 transition-all" />
               </div>
@@ -350,9 +350,9 @@ Contact Customer: [EMAIL_1] (Card: [CARD_1])`;
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
         <div className="p-5 rounded-2xl bg-[var(--surface-sunken)] border border-[var(--line)] text-center space-y-1">
           <span className="text-2xl sm:text-3xl font-headline font-bold text-[var(--accent)]">
-            0 Bytes
+            Local
           </span>
-          <p className="text-xs text-[var(--muted)] font-mono">Server Telemetry</p>
+          <p className="text-xs text-[var(--muted)] font-mono">Content Processing</p>
         </div>
         <div className="p-5 rounded-2xl bg-[var(--surface-sunken)] border border-[var(--line)] text-center space-y-1">
           <span className="text-2xl sm:text-3xl font-headline font-bold text-[var(--text)]">
@@ -368,9 +368,9 @@ Contact Customer: [EMAIL_1] (Card: [CARD_1])`;
         </div>
         <div className="p-5 rounded-2xl bg-[var(--surface-sunken)] border border-[var(--line)] text-center space-y-1">
           <span className="text-2xl sm:text-3xl font-headline font-bold text-[var(--accent)]">
-            &lt; 1 ms
+            &lt; 500 ms
           </span>
-          <p className="text-xs text-[var(--muted)] font-mono">Execution Latency</p>
+          <p className="text-xs text-[var(--muted)] font-mono">100 KB Scrub Target</p>
         </div>
       </section>
     </div>
