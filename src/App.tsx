@@ -1,4 +1,3 @@
-import { Analytics } from '@vercel/analytics/react';
 import {
   ArrowRight,
   BookOpen,
@@ -451,7 +450,6 @@ export function App() {
         onClose={() => setShowFeedback(false)}
       />
 
-      <Analytics />
     </div>
   );
 }

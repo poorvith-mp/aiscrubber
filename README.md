@@ -18,7 +18,7 @@
 
 **AIScrubber** is an offline-capable, browser-local privacy desk and developer toolkit engineered for the exact moment before sensitive data travels to AI frontier models (ChatGPT, Claude, Gemini), public GitHub issues, or email threads.
 
-All user-provided content is processed in local memory and is never uploaded to AIScrubber. The website uses privacy-respecting page analytics and fetches the public GitHub star count; neither request contains text, prompts, files, or redaction data.
+All user-provided content is processed in local memory and is never uploaded to AIScrubber. The website does not run page analytics. It fetches the public GitHub star count, and that request contains no text, prompts, files, or redaction data.
 
 ---
 
@@ -128,7 +128,7 @@ Add the following to your `claude_desktop_config.json`:
 |---|---|
 | **Execution Environment** | Client-Side Browser Memory / Local Node.js Process |
 | **Sensitive Content Uploads** | **0** — processing stays in browser memory or the local Node.js process |
-| **Non-content Requests** | Page analytics and the public GitHub star count; no pasted text, files, mappings, or keys |
+| **Non-content Requests** | The public GitHub star count only; no pasted text, files, mappings, or keys |
 | **Storage** | Ephemeral RAM only (LocalStorage used only for dark/light UI preference) |
 | **License** | Open Source MIT License |
 

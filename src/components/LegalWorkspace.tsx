@@ -85,9 +85,9 @@ export function LegalWorkspace() {
           </section>
 
           <section className="space-y-3">
-            <h4 className="font-bold text-base text-[var(--text)]">2. Sensitive Content and Site Analytics</h4>
+            <h4 className="font-bold text-base text-[var(--text)]">2. Sensitive Content and External Requests</h4>
             <p>
-              We do not track, log, intercept, or transmit user-provided content, and we do not store sensitive drafts in cookies or external databases. The site uses Vercel Analytics for non-content page-visit measurements and requests the repository's public GitHub star count. Those requests do not include pasted text, uploaded files, redaction data, or session keys.
+              We do not track, log, intercept, or transmit user-provided content, and we do not store sensitive drafts in cookies or external databases. The site does not run a page-analytics service. It requests the repository's public GitHub star count, and that request does not include pasted text, uploaded files, redaction data, or session keys.
             </p>
           </section>
 
