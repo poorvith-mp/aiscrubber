@@ -147,4 +147,4 @@ Designed and built by **[Poorvith M P](https://poorvithmp.com)**, 19-year-old st
 
 ## 📄 License
 
-Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for details.
+Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for details. HI
