@@ -362,6 +362,82 @@ function inspectContent(target) {
   };
 }
 
+
+function stripPngMetadata(buffer) {
+  const signature = buffer.subarray(0, 8);
+  if (signature.length < 8 || signature[0] !== 0x89 || signature[1] !== 0x50) return null;
+  const chunks = [signature];
+  const removable = new Set(['tEXt', 'iTXt', 'zTXt', 'eXIf', 'caPI', 'c2pa', 'jumb']);
+  let offset = 8;
+  while (offset + 12 <= buffer.length) {
+    const length = buffer.readUInt32BE(offset);
+    const total = 12 + length;
+    if (offset + total > buffer.length) return null;
+    const type = buffer.toString('ascii', offset + 4, offset + 8);
+    if (!removable.has(type)) chunks.push(buffer.subarray(offset, offset + total));
+    offset += total;
+    if (type === 'IEND') break;
+  }
+  return Buffer.concat(chunks);
+}
+
+function stripJpegMetadata(buffer) {
+  if (buffer.length < 4 || buffer[0] !== 0xff || buffer[1] !== 0xd8) return null;
+  const segments = [buffer.subarray(0, 2)];
+  let offset = 2;
+  while (offset + 4 <= buffer.length) {
+    if (buffer[offset] !== 0xff) return null;
+    const marker = buffer[offset + 1];
+    if (marker === 0xda || marker === 0xd9) {
+      segments.push(buffer.subarray(offset));
+      return Buffer.concat(segments);
+    }
+    const length = buffer.readUInt16BE(offset + 2);
+    const total = length + 2;
+    if (length < 2 || offset + total > buffer.length) return null;
+    if (marker !== 0xe1 && marker !== 0xeb) segments.push(buffer.subarray(offset, offset + total));
+    offset += total;
+  }
+  return Buffer.concat(segments);
+}
+
+function stripWebpMetadata(buffer) {
+  if (buffer.length < 12) return null;
+  const riff = buffer.toString('ascii', 0, 4);
+  const webp = buffer.toString('ascii', 8, 12);
+  if (riff !== 'RIFF' || webp !== 'WEBP') return null;
+
+  const chunks = [buffer.subarray(0, 12)];
+  const removable = new Set(['EXIF', 'XMP ']);
+  let offset = 12;
+  let totalLength = 12;
+
+  while (offset + 8 <= buffer.length) {
+    const chunkType = buffer.toString('ascii', offset, offset + 4);
+    const chunkSize = buffer.readUInt32LE(offset + 4);
+    const paddedSize = 8 + chunkSize + (chunkSize % 2);
+    if (offset + 8 + chunkSize > buffer.length) break;
+
+    const chunkData = buffer.subarray(offset, Math.min(offset + paddedSize, buffer.length));
+    if (!removable.has(chunkType)) {
+      if (chunkType === 'VP8X' && chunkData.length >= 9) {
+        const modified = Buffer.from(chunkData);
+        modified[8] = modified[8] & ~0x0c;
+        chunks.push(modified);
+        totalLength += modified.length;
+      } else {
+        chunks.push(chunkData);
+        totalLength += chunkData.length;
+      }
+    }
+    offset += paddedSize;
+  }
+
+  const result = Buffer.concat(chunks, totalLength);
+  result.writeUInt32LE(result.length - 8, 4);
+  return result;
+}
+
 async function resolveInput(target) {
   if (target && target !== '-') {
     if (fs.existsSync(target)) {
@@ -565,7 +641,14 @@ async function run() {
       const buffer = fs.readFileSync(filePath);
       const ext = path.extname(filePath).toLowerCase();
 
-      if (ext === '.pdf') {
+      let cleaned = null;
+      if (ext === '.png') {
+        cleaned = stripPngMetadata(buffer);
+      } else if (['.jpg', '.jpeg'].includes(ext)) {
+        cleaned = stripJpegMetadata(buffer);
+      } else if (ext === '.webp') {
+        cleaned = stripWebpMetadata(buffer);
+      } else if (ext === '.pdf') {
         let text = buffer.toString('latin1');
         text = text.replace(/\/Info\s+\d+\s+\d+\s+R/g, '/Info null');
         text = text.replace(/\/Author\s*\([^)]*\)/gi, '/Author ()');
@@ -573,13 +656,17 @@ async function run() {
         text = text.replace(/\/Producer\s*\([^)]*\)/gi, '/Producer ()');
         text = text.replace(/\/Title\s*\([^)]*\)/gi, '/Title ()');
         text = text.replace(/\/CreationDate\s*\([^)]*\)/gi, '/CreationDate ()');
-
-        const outPath = filePath.replace(/\.pdf$/i, '_sanitized.pdf');
-        fs.writeFileSync(outPath, Buffer.from(text, 'latin1'));
-        console.log(`\x1b[32m✔ Stripped PDF metadata:\x1b[0m ${outPath}`);
-      } else {
-        console.log(`\x1b[32m✔ Stripped metadata:\x1b[0m ${filePath}`);
+        cleaned = Buffer.from(text, 'latin1');
       }
+
+      if (!cleaned) {
+        console.warn(`\x1b[33mWarning:\x1b[0m '${filePath}' is not a supported format or could not be stripped.`);
+        continue;
+      }
+
+      const outPath = filePath.replace(/(\.[^.]+)$/i, '_sanitized$1');
+      fs.writeFileSync(outPath, cleaned);
+      console.log(`\x1b[32m✔ Stripped metadata:\x1b[0m ${outPath}`);
     }
     return;
   }

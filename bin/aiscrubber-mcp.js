@@ -140,12 +140,9 @@ function inspectContent(content) {
   const threats = [];
   const details = {};
 
-  if (content.includes('caPI') || content.includes('c2pa') || content.includes('jumb') || content.includes('\xFF\xEB')) {
-    threats.push('C2PA Content Credentials cryptographic manifest active');
+  if (content.includes('caPI') || content.includes('jumb') || content.includes('\xFF\xEB')) {
+    threats.push('C2PA-compatible metadata marker detected; signature not verified');
     details.c2pa = { hasManifest: true };
-    if (content.includes('OpenAI')) details.c2pa.signer = 'OpenAI Inc.';
-    if (content.includes('Nano Banana')) details.c2pa.signer = 'Nano Banana CA';
-    if (content.includes('Adobe')) details.c2pa.signer = 'Adobe Inc.';
   }
 
   const scrubbed = scrubBuiltIns(content);

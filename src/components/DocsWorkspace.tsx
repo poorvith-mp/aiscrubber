@@ -60,7 +60,7 @@ When user CUST-44912 (email: billing@partner.org) charges over $500, trigger web
   "mcpServers": {
     "aiscrubber": {
       "command": "npx",
-      "args": ["-y", "aiscrubber-mcp"]
+      "args": ["-y", "aiscrubber", "mcp"]
     }
   }
 }`;
@@ -120,10 +120,10 @@ When user CUST-44912 (email: billing@partner.org) charges over $500, trigger web
               <div className="p-3.5 rounded-xl bg-[var(--surface-sunken)] border border-[var(--line)] space-y-1.5">
                 <span className="font-bold text-xs text-[var(--accent)] flex items-center gap-1.5">
                   <Sparkles size={14} />
-                  3. AI Watermark Remover
+                  3. AI Text Watermark & Unicode Cleaner
                 </span>
                 <p className="text-xs">
-                  Strips Claude zero-width invisible watermarks, normalizes non-standard spaces, and reverts homoglyphs.
+                  Removes selected invisible Unicode markers, normalizes non-standard spaces, and flags confusables without claiming model attribution.
                 </p>
               </div>
               <div className="p-3.5 rounded-xl bg-[var(--surface-sunken)] border border-[var(--line)] space-y-1.5">
@@ -143,19 +143,20 @@ When user CUST-44912 (email: billing@partner.org) charges over $500, trigger web
         id: 'watermark-remover',
         category: 'features',
         categoryLabel: 'Core Features',
-        title: 'AI Text & Claude Watermark Remover',
+        title: 'AI Text Watermark & Unicode Cleaner',
         description:
-          'Deep technical overview: Invisible Unicode zero-width tokens, Unicode Tag Plane steganography, non-standard spaces, and AI stylometric cadence disruption.',
+          'Invisible Unicode cleanup, Tag Plane inspection, non-standard spaces, confusables, and optional copy-pattern replacement.',
         headings: [
-          { id: 'watermark-overview', title: 'Why AI Watermarks Exist' },
+          { id: 'watermark-overview', title: 'What This Tool Can Verify' },
           { id: 'unicode-detectors', title: 'Multi-Plane Invisible Unicode' },
           { id: 'stylometric-disruption', title: 'AI Cadence & Stylometric Disruption' },
           { id: 'cleaning-profiles', title: 'Cleaning Profiles & Presets' },
+          { id: 'watermark-credit', title: 'Credits' },
         ],
         content: (
           <div className="space-y-6 text-sm text-[var(--muted)] leading-relaxed">
             <p id="watermark-overview">
-              Leading frontier AI models (including Anthropic Claude 3.5, ChatGPT, and Google Gemini) employ invisible watermarks and statistical token distribution biases to embed cryptographic or machine-detectable provenance signals into generated text.
+              AIScrubber can verify that specific invisible Unicode characters, Tag Plane tokens, unusual spaces, or confusable characters are present. Those findings do not identify the model that produced the text and do not prove a vendor watermark.
             </p>
 
             <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 space-y-1">
@@ -164,7 +165,7 @@ When user CUST-44912 (email: billing@partner.org) charges over $500, trigger web
                 Multi-Layer Watermarking Anatomy
               </strong>
               <p className="text-xs text-blue-200/90">
-                AIScrubber sanitizes both <strong>deterministic invisible Unicode markers</strong> (zero-width characters, variation selectors, tag-plane tokens) and <strong>statistical stylometric anomalies</strong> (Green-list n-gram clichés and artificial punctuation spacing).
+                AIScrubber removes <strong>deterministic Unicode markers</strong> (selected zero-width characters, variation selectors, and Tag Plane tokens) and can optionally replace a short list of common AI-style phrases. Phrase matching is copy cleanup, not statistical watermark detection.
               </p>
             </div>
 
@@ -194,7 +195,7 @@ When user CUST-44912 (email: billing@partner.org) charges over $500, trigger web
               AI Cadence & Stylometric Disruption
             </h4>
             <p className="text-xs">
-              Statistical detectors scan for unmistakable transitional clichés and fixed n-gram word choices. AIScrubber normalizes over 12 high-frequency AI phrases:
+              Optional literal phrase rules replace a small set of overused AI-style expressions. They are editable copy rules, not a classifier or provenance detector.
             </p>
             <div className="border border-[var(--line)] rounded-xl overflow-hidden text-xs font-mono">
               <div className="grid grid-cols-12 bg-[var(--surface-sunken)] p-2.5 font-bold text-[var(--text)] border-b border-[var(--line)]">
@@ -234,6 +235,16 @@ When user CUST-44912 (email: billing@partner.org) charges over $500, trigger web
               <li><strong>Code Safe:</strong> Preserves necessary syntax indentation for Python, YAML, JS, and Rust while stripping invisible characters.</li>
               <li><strong>Invisible Unicode Only:</strong> Minimalist mode removing strictly zero-width and bidi characters.</li>
             </ul>
+
+            <div id="watermark-credit" className="p-4 rounded-xl bg-[var(--surface-sunken)] border border-[var(--line)] space-y-2 text-xs">
+              <strong className="block text-[var(--text)]">Credits</strong>
+              <p>
+                The watermark-cleaning work was inspired by{' '}
+                <a href="https://github.com/guillaumemeyer" target="_blank" rel="noreferrer" className="text-[var(--accent)] font-bold hover:underline">Guillaume Meyer</a>
+                {' '}and his open-source{' '}
+                <a href="https://github.com/guillaumemeyer/watermarks-remover" target="_blank" rel="noreferrer" className="text-[var(--accent)] font-bold hover:underline">watermarks-remover repository</a>.
+              </p>
+            </div>
           </div>
         ),
       },
@@ -304,7 +315,7 @@ When user CUST-44912 (email: billing@partner.org) charges over $500, trigger web
                   <span className="font-mono text-[10px] text-[var(--muted)]">Options: -o, --json</span>
                 </div>
                 <p className="text-[var(--muted)]">
-                  Strips Claude zero-width watermarks (`\u200B`, `\uFEFF`, `\u2060`), converts synthetic whitespace to ASCII spaces, and normalizes confusable homoglyphs.
+                  Removes selected zero-width characters (`\u200B`, `\uFEFF`, `\u2060`), converts synthetic whitespace to ASCII spaces, and normalizes selected confusables.
                 </p>
               </div>
 
@@ -497,9 +508,9 @@ When user CUST-44912 (email: billing@partner.org) charges over $500, trigger web
         id: 'metadata-desk',
         category: 'features',
         categoryLabel: 'Core Features',
-        title: 'Metadata & C2PA Provenance Desk',
+        title: 'Image Metadata & C2PA Marker Desk',
         description:
-          'Deep client-side inspection of C2PA Content Credentials (ChatGPT, DALL·E 3, Nano Banana), EXIF/GPS, PDF author streams, and audio ID3 tags.',
+          'Client-side inspection and removal of supported EXIF/GPS, PNG text, and C2PA-compatible image metadata markers.',
         headings: [
           { id: 'c2pa-provenance', title: 'C2PA Content Credentials' },
           { id: 'supported-formats', title: 'Supported Formats' },
@@ -507,10 +518,10 @@ When user CUST-44912 (email: billing@partner.org) charges over $500, trigger web
         content: (
           <div className="space-y-6 text-sm text-[var(--muted)] leading-relaxed">
             <h4 id="c2pa-provenance" className="text-base font-bold text-[var(--text)]">
-              C2PA Content Credentials & AI Provenance
+              C2PA-compatible marker handling
             </h4>
             <p>
-              AIScrubber parses cryptographic C2PA JUMBF manifests (APP11 segment in JPEG, `caPI` chunks in PNG) embedded by ChatGPT (DALL·E 3), Nano Banana, and Adobe Firefly, extracting the signing authority and original generation prompts.
+              AIScrubber detects supported JPEG APP11 and PNG metadata markers and can remove them during export. It does not parse or verify the cryptographic claim, identify the issuer, or recover a generation prompt.
             </p>
 
             <h4 id="supported-formats" className="text-base font-bold text-[var(--text)] pt-2">
@@ -521,13 +532,9 @@ When user CUST-44912 (email: billing@partner.org) charges over $500, trigger web
                 <strong className="block text-[var(--text)] font-semibold mb-1">Images & C2PA</strong>
                 <span>JPEG (EXIF/GPS/XMP/APP11), PNG (tEXt/caPI), WebP, SVG</span>
               </div>
-              <div className="p-3 rounded-lg bg-[var(--surface-sunken)] border border-[var(--line)]">
-                <strong className="block text-[var(--text)] font-semibold mb-1">Documents</strong>
-                <span>PDF (/Info dictionaries & /Metadata streams)</span>
-              </div>
-              <div className="p-3 rounded-lg bg-[var(--surface-sunken)] border border-[var(--line)]">
-                <strong className="block text-[var(--text)] font-semibold mb-1">Audio & Media</strong>
-                <span>MP3 & WAV (ID3v1 & ID3v2 containers)</span>
+              <div className="p-3 rounded-lg bg-[var(--surface-sunken)] border border-[var(--line)] sm:col-span-2">
+                <strong className="block text-[var(--text)] font-semibold mb-1">Current browser support</strong>
+                <span>JPEG, PNG, and WebP images. PDF and audio rewriting are intentionally not offered because byte-level replacement can corrupt those containers.</span>
               </div>
             </div>
           </div>

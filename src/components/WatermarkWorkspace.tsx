@@ -7,6 +7,7 @@ import {
   Code2,
   Download,
   Eye,
+  ExternalLink,
   FileCode2,
   FileText,
   HelpCircle,
@@ -105,16 +106,16 @@ export function WatermarkWorkspace() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-[var(--line)]">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="badge-emerald">AI Watermark Engine v2.3</span>
+            <span className="badge-emerald">Unicode Hygiene Engine v2.3</span>
             <span className="text-xs text-[var(--muted)] font-mono">
-              Claude · Tag Plane · Zero-Width · Stylometry
+              Tag Plane · Zero-Width · Confusables · Copy Cleanup
             </span>
           </div>
           <h2 className="text-2xl md:text-3xl font-headline font-bold">
-            AI Text & Claude Watermark Remover
+            AI Text Watermark & Unicode Cleaner
           </h2>
           <p className="text-sm text-[var(--muted)] mt-1">
-            Strip invisible Unicode zero-width watermarks, Unicode Tag Plane tokens, synthetic whitespace, and disrupt AI stylometric cadence in 100% local RAM.
+            Inspect and remove invisible Unicode markers, Tag Plane tokens, synthetic whitespace, confusables, and optional AI-style copy patterns in local RAM.
           </p>
         </div>
 
@@ -125,7 +126,7 @@ export function WatermarkWorkspace() {
             className="btn-secondary text-xs flex items-center gap-1.5"
           >
             <Sparkles size={14} className="text-[var(--accent)]" />
-            Claude 3.5 Sample
+            Mixed Unicode Sample
           </button>
           <button
             type="button"
@@ -148,13 +149,27 @@ export function WatermarkWorkspace() {
         </div>
       </div>
 
+      <div className="p-4 rounded-xl bg-[var(--surface-sunken)] border border-[var(--line)] text-xs text-[var(--muted)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <p>
+          Inspired by Guillaume Meyer&apos;s open-source watermark research and tooling. This browser tool detects text patterns; it does not prove which model created the text or verify a vendor watermark.
+        </p>
+        <div className="flex items-center gap-3 shrink-0">
+          <a href="https://github.com/guillaumemeyer" target="_blank" rel="noreferrer" className="text-[var(--accent)] font-bold hover:underline inline-flex items-center gap-1">
+            Guillaume Meyer <ExternalLink size={11} />
+          </a>
+          <a href="https://github.com/guillaumemeyer/watermarks-remover" target="_blank" rel="noreferrer" className="text-[var(--accent)] font-bold hover:underline inline-flex items-center gap-1">
+            Source project <ExternalLink size={11} />
+          </a>
+        </div>
+      </div>
+
       {/* Threat Meter & Status Banner */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
         {/* Threat Score Gauge Card */}
         <div className="md:col-span-4 p-5 rounded-2xl bg-[var(--surface-sunken)] border border-[var(--line)] flex items-center justify-between gap-4 shadow-sm">
           <div className="space-y-1">
             <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--muted)] block">
-              AI Watermark Threat Score
+              Unicode Hygiene Score
             </span>
             <div className="flex items-baseline gap-2">
               <span className={`text-3xl font-bold font-mono ${

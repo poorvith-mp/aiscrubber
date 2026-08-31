@@ -59,7 +59,6 @@ export function MetadataWorkspace() {
   const [progress, setProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
   const [activeTab, setActiveTab] = useState<'view' | 'edit' | 'strip'>('view');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [copiedPrompt, setCopiedPrompt] = useState(false);
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
 
@@ -70,22 +69,12 @@ export function MetadataWorkspace() {
     Copyright: '',
     Software: '',
   });
-  const [signWithC2pa, setSignWithC2pa] = useState(true);
-  const [c2paSigner, setC2paSigner] = useState('');
-  const [c2paGenerator, setC2paGenerator] = useState('');
-  const [c2paAction, setC2paAction] = useState('c2pa.created (Custom Content Credentials)');
-  const [c2paPrompt, setC2paPrompt] = useState('');
-
   // Bulk Edit State
   const [bulkFields, setBulkFields] = useState({
-    Author: 'Poorvith M P',
+    Author: '',
     Title: '',
-    Software: 'AIScrubber Privacy Suite v2.3.0',
-    Copyright: 'CC-BY 4.0 / All Rights Reserved',
-    c2paSigner: 'Poorvith M P',
-    c2paGenerator: 'AIScrubber Privacy Suite',
-    c2paAction: 'c2pa.created (Custom Content Credentials)',
-    signWithC2pa: true,
+    Software: '',
+    Copyright: '',
   });
 
   const activeItem = useMemo(() => {
@@ -94,7 +83,7 @@ export function MetadataWorkspace() {
 
   // Handle Bulk Files Selection / Drop
   async function handleFilesSelected(fileList: FileList | File[]) {
-    const newFiles = Array.from(fileList);
+    const newFiles = Array.from(fileList).filter((file) => file.type.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(file.name));
     if (newFiles.length === 0) return;
 
     setStatusMessage(null);
@@ -151,10 +140,10 @@ export function MetadataWorkspace() {
     );
     const copyField = parsed.fields.find((f) => f.tag.includes('Copyright'));
 
-    const initialAuthor = authorField?.value || parsed.c2pa?.signer || 'Poorvith M P';
-    const initialTitle = titleField?.value || parsed.c2pa?.aiPrompt || '';
-    const initialSoftware = softwareField?.value || parsed.c2pa?.generator || 'AIScrubber Suite v2.3.0';
-    const initialCopyright = copyField?.value || 'CC-BY 4.0 / All Rights Reserved';
+    const initialAuthor = authorField?.value || '';
+    const initialTitle = titleField?.value || '';
+    const initialSoftware = softwareField?.value || '';
+    const initialCopyright = copyField?.value || '';
 
     setEditFields({
       Author: initialAuthor,
@@ -162,11 +151,6 @@ export function MetadataWorkspace() {
       Software: initialSoftware,
       Copyright: initialCopyright,
     });
-
-    setC2paSigner(parsed.c2pa?.signer || initialAuthor);
-    setC2paGenerator(parsed.c2pa?.generator || initialSoftware);
-    setC2paAction(parsed.c2pa?.claimAction || 'c2pa.created (Custom Content Credentials)');
-    setC2paPrompt(parsed.c2pa?.aiPrompt || initialTitle);
   }
 
   function onDrop(e: React.DragEvent) {
@@ -237,10 +221,10 @@ export function MetadataWorkspace() {
     }
 
     setIsBatchProcessing(false);
-    setStatusMessage(`Successfully stripped metadata and C2PA manifests from all ${items.length} file(s)!`);
+    setStatusMessage(`Removed supported metadata markers from ${items.length} image(s).`);
   }
 
-  // Apply Bulk Metadata & C2PA Edits to All Files
+  // Apply standard metadata edits to all supported images.
   async function handleApplyBulkEdits() {
     if (items.length === 0) return;
     setIsBatchProcessing(true);
@@ -260,11 +244,6 @@ export function MetadataWorkspace() {
           Title: bulkFields.Title || item.file.name.replace(/\.[^/.]+$/, ''),
           Software: bulkFields.Software,
           Copyright: bulkFields.Copyright,
-          c2paSigner: bulkFields.c2paSigner,
-          c2paGenerator: bulkFields.c2paGenerator,
-          c2paAction: bulkFields.c2paAction,
-          c2paPrompt: bulkFields.Title || item.file.name,
-          signWithC2pa: bulkFields.signWithC2pa,
         });
 
         setItems((prev) =>
@@ -280,7 +259,7 @@ export function MetadataWorkspace() {
     }
 
     setIsBatchProcessing(false);
-    setStatusMessage(`Bulk metadata & C2PA manifests encoded onto ${items.length} file(s)!`);
+    setStatusMessage(`Updated standard metadata for ${items.length} image(s).`);
   }
 
   // Download All as ZIP archive
@@ -347,11 +326,6 @@ export function MetadataWorkspace() {
         Title: editFields.Title,
         Software: editFields.Software,
         Copyright: editFields.Copyright,
-        c2paSigner: c2paSigner || editFields.Author,
-        c2paGenerator: c2paGenerator || editFields.Software,
-        c2paAction,
-        c2paPrompt: c2paPrompt || editFields.Title,
-        signWithC2pa,
       });
 
       setItems((prev) =>
@@ -361,7 +335,7 @@ export function MetadataWorkspace() {
       );
 
       setStatusMessage(
-        `Custom Metadata & C2PA encoded for ${activeItem.file.name}! Old manifests were wiped.`
+        `Updated standard metadata for ${activeItem.file.name}. Existing C2PA-compatible markers were removed.`
       );
 
       const url = URL.createObjectURL(modifiedBlob);
@@ -378,12 +352,6 @@ export function MetadataWorkspace() {
     }
   }
 
-  const copyPromptToClipboard = async (text: string) => {
-    await navigator.clipboard.writeText(text);
-    setCopiedPrompt(true);
-    setTimeout(() => setCopiedPrompt(false), 2000);
-  };
-
   const totalC2paDetected = items.filter((it) => it.analysis?.c2pa?.hasManifest).length;
   const totalGpsDetected = items.filter((it) => it.analysis?.gpsCoordinates).length;
 
@@ -393,16 +361,16 @@ export function MetadataWorkspace() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-[var(--line)]">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="badge-emerald">Bulk C2PA & Metadata Desk</span>
+            <span className="badge-emerald">Local Metadata Desk</span>
             <span className="text-xs text-[var(--muted)] font-mono">
-              Multi-Upload · Batch Strip · C2PA Re-Signer · ZIP Export
+              Multi-Upload · Inspect · Strip · ZIP Export
             </span>
           </div>
           <h2 className="text-2xl md:text-3xl font-headline font-bold">
             Metadata & C2PA Provenance Desk
           </h2>
           <p className="text-sm text-[var(--muted)] mt-1">
-            Bulk inspect, overwrite, or strip C2PA Content Credentials (ChatGPT, DALL·E 3, Nano Banana, Adobe) and EXIF GPS tags across unlimited files with 100% in-browser memory.
+            Inspect and remove supported EXIF, GPS, PNG text, and C2PA-compatible metadata markers from images in browser memory. Marker presence is detected; cryptographic signature verification is not performed.
           </p>
         </div>
 
@@ -415,7 +383,7 @@ export function MetadataWorkspace() {
                 type="file"
                 multiple
                 onChange={(e) => e.target.files && handleFilesSelected(e.target.files)}
-                accept="image/*,application/pdf,audio/*"
+                accept="image/png,image/jpeg,image/webp"
                 className="hidden"
               />
             </label>
@@ -460,10 +428,10 @@ export function MetadataWorkspace() {
           </div>
           <div className="space-y-1">
             <h3 className="font-headline font-bold text-lg sm:text-xl text-[var(--text)]">
-              Drop Single or Multiple Files for Bulk C2PA Stripping
+              Drop Images for Local Metadata Inspection
             </h3>
             <p className="text-xs text-[var(--muted)] max-w-lg mx-auto">
-              Select multiple JPEG, PNG (tEXt/caPI chunks), WebP, PDF documents, or Audio files. 100% Client-Side Parallel Batch Engine.
+              Select JPEG, PNG, or WebP images. Metadata inspection and supported cleanup stay in this browser tab.
             </p>
           </div>
           <div className="pt-2 flex items-center justify-center gap-3">
@@ -474,7 +442,7 @@ export function MetadataWorkspace() {
                 type="file"
                 multiple
                 onChange={(e) => e.target.files && handleFilesSelected(e.target.files)}
-                accept="image/*,application/pdf,audio/*"
+                accept="image/png,image/jpeg,image/webp"
                 className="hidden"
               />
             </label>
@@ -550,10 +518,10 @@ export function MetadataWorkspace() {
                 className="btn-primary text-xs font-bold flex items-center gap-1.5 shadow-md hover:scale-105 transition-all"
               >
                 <Zap size={14} />
-                {isBatchProcessing ? `Stripping (${progress.current}/${progress.total})...` : '1-Click Strip All C2PA & EXIF'}
+                {isBatchProcessing ? `Stripping (${progress.current}/${progress.total})...` : 'Strip Supported Metadata'}
               </button>
 
-              {/* Bulk Edit / Re-Sign Button */}
+              {/* Bulk Edit Button */}
               <button
                 type="button"
                 onClick={() => setShowBulkEditModal(true)}
@@ -561,7 +529,7 @@ export function MetadataWorkspace() {
                 className="btn-secondary text-xs font-bold flex items-center gap-1.5"
               >
                 <Edit3 size={14} />
-                Bulk Re-Sign C2PA
+                Bulk Edit Metadata
               </button>
 
               {/* Download All ZIP */}
@@ -592,7 +560,7 @@ export function MetadataWorkspace() {
                     type="file"
                     multiple
                     onChange={(e) => e.target.files && handleFilesSelected(e.target.files)}
-                    accept="image/*,application/pdf,audio/*"
+                    accept="image/png,image/jpeg,image/webp"
                     className="hidden"
                   />
                 </label>
@@ -658,7 +626,7 @@ export function MetadataWorkspace() {
                       <div className="flex items-center gap-1.5 flex-wrap text-[10px] font-mono">
                         {hasC2pa && (
                           <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
-                            C2PA [CR] {it.analysis?.c2pa?.signer?.slice(0, 14)}
+                            C2PA-compatible marker detected
                           </span>
                         )}
                         {hasGps && (
@@ -732,26 +700,22 @@ export function MetadataWorkspace() {
                   {/* TAB 1: VIEWER & C2PA MANIFEST CARD */}
                   {activeTab === 'view' && activeItem.analysis && (
                     <div className="space-y-5">
-                      {/* C2PA Manifest Card */}
+                      {/* C2PA-compatible marker card */}
                       {activeItem.analysis.c2pa?.hasManifest ? (
-                        <div className="p-4 sm:p-5 rounded-2xl bg-[var(--surface-sunken)] border-2 border-emerald-500/40 shadow-sm space-y-4">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--line)]">
+                        <div className="p-4 sm:p-5 rounded-2xl bg-[var(--surface-sunken)] border border-amber-500/40 shadow-sm">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <div className="flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center font-mono font-bold text-emerald-400 text-sm">
+                              <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center font-mono font-bold text-amber-400 text-sm">
                                 CR
                               </div>
                               <div>
                                 <div className="flex items-center gap-2">
                                   <h4 className="font-headline font-bold text-base text-[var(--text)]">
-                                    Content Credentials (C2PA)
+                                    C2PA-compatible marker detected
                                   </h4>
-                                  <span className="badge-emerald flex items-center gap-1">
-                                    <ShieldCheck size={12} />
-                                    Verified Manifest
-                                  </span>
                                 </div>
                                 <p className="text-xs text-[var(--muted)]">
-                                  Cryptographic provenance manifest active on this file.
+                                  AIScrubber can remove this marker, but it does not verify signatures or identify the issuing vendor.
                                 </p>
                               </div>
                             </div>
@@ -762,72 +726,16 @@ export function MetadataWorkspace() {
                               className="btn-secondary text-xs text-red-400 font-bold flex items-center gap-1.5 self-start sm:self-auto"
                             >
                               <Trash2 size={13} />
-                              Strip C2PA Manifest
+                              Remove Marker
                             </button>
                           </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 text-xs font-mono">
-                            <div className="p-2.5 rounded-xl bg-[var(--panel)] border border-[var(--line)]">
-                              <span className="text-[10px] text-[var(--muted)] block uppercase">Signer / Issuer</span>
-                              <span className="font-bold text-[var(--accent)] block truncate">
-                                {activeItem.analysis.c2pa.signer}
-                              </span>
-                            </div>
-                            <div className="p-2.5 rounded-xl bg-[var(--panel)] border border-[var(--line)]">
-                              <span className="text-[10px] text-[var(--muted)] block uppercase">Generator / Tool</span>
-                              <span className="font-bold text-[var(--text)] block truncate">
-                                {activeItem.analysis.c2pa.generator}
-                              </span>
-                            </div>
-                            <div className="p-2.5 rounded-xl bg-[var(--panel)] border border-[var(--line)]">
-                              <span className="text-[10px] text-[var(--muted)] block uppercase">Claim Action</span>
-                              <span className="font-bold text-[var(--text)] block truncate">
-                                {activeItem.analysis.c2pa.claimAction}
-                              </span>
-                            </div>
-                            <div className="p-2.5 rounded-xl bg-[var(--panel)] border border-[var(--line)]">
-                              <span className="text-[10px] text-[var(--muted)] block uppercase">Timestamp</span>
-                              <span className="font-bold text-[var(--text)] block truncate">
-                                {activeItem.analysis.c2pa.timestamp}
-                              </span>
-                            </div>
-                          </div>
-
-                          {activeItem.analysis.c2pa.aiPrompt && (
-                            <div className="p-3 rounded-xl bg-[var(--panel)] border border-[var(--line)] space-y-1.5">
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs font-bold text-[var(--accent)] flex items-center gap-1">
-                                  <Sparkles size={13} /> Embedded AI Generation Prompt
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => copyPromptToClipboard(activeItem.analysis?.c2pa?.aiPrompt || '')}
-                                  className="text-[11px] text-[var(--muted)] hover:text-[var(--text)] font-mono flex items-center gap-1"
-                                >
-                                  {copiedPrompt ? <Check size={11} /> : <Clipboard size={11} />}
-                                  {copiedPrompt ? 'Copied' : 'Copy'}
-                                </button>
-                              </div>
-                              <p className="text-xs font-mono bg-[var(--surface-sunken)] p-2 rounded-lg border border-[var(--line)] text-[var(--text)]">
-                                {activeItem.analysis.c2pa.aiPrompt}
-                              </p>
-                            </div>
-                          )}
                         </div>
                       ) : (
-                        <div className="p-4 rounded-xl bg-[var(--surface-sunken)] border border-[var(--line)] flex items-center justify-between">
+                        <div className="p-4 rounded-xl bg-[var(--surface-sunken)] border border-[var(--line)]">
                           <span className="text-xs text-[var(--muted)] flex items-center gap-2">
                             <ShieldCheck size={16} className="text-emerald-400" />
-                            No C2PA Content Credentials manifest detected on this file.
+                            No C2PA-compatible marker detected on this file.
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => setActiveTab('edit')}
-                            className="btn-secondary text-xs font-bold flex items-center gap-1"
-                          >
-                            <Edit3 size={12} />
-                            Sign with C2PA
-                          </button>
                         </div>
                       )}
 
@@ -939,71 +847,9 @@ export function MetadataWorkspace() {
                         </div>
                       </div>
 
-                      {/* C2PA Signer Block */}
-                      <div className="p-4 rounded-xl bg-[var(--surface-sunken)] border border-emerald-500/30 space-y-3">
-                        <div className="flex items-center justify-between pb-2 border-b border-[var(--line)]">
-                          <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5 font-headline">
-                            <ShieldCheck size={15} />
-                            C2PA Content Credentials [CR] Manifest Overwrite
-                          </span>
-                          <input
-                            type="checkbox"
-                            checked={signWithC2pa}
-                            onChange={(e) => setSignWithC2pa(e.target.checked)}
-                            className="accent-emerald-500 w-4 h-4 cursor-pointer"
-                          />
-                        </div>
-
-                        {signWithC2pa && (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                            <div className="space-y-1">
-                              <label className="font-semibold text-[var(--muted)]">C2PA Signer / Issuer</label>
-                              <input
-                                type="text"
-                                value={c2paSigner}
-                                onChange={(e) => setC2paSigner(e.target.value)}
-                                placeholder="e.g. Poorvith"
-                                className="input-field text-xs font-mono"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="font-semibold text-[var(--muted)]">AI Model / Generator</label>
-                              <input
-                                type="text"
-                                value={c2paGenerator}
-                                onChange={(e) => setC2paGenerator(e.target.value)}
-                                placeholder="e.g. AIScrubber Privacy Suite"
-                                className="input-field text-xs font-mono"
-                              />
-                            </div>
-                            <div className="space-y-1 sm:col-span-2">
-                              <label className="font-semibold text-[var(--muted)]">Claim Action</label>
-                              <select
-                                value={c2paAction}
-                                onChange={(e) => setC2paAction(e.target.value)}
-                                className="input-field text-xs font-mono bg-[var(--panel)]"
-                              >
-                                <option value="c2pa.created (Custom Content Credentials)">
-                                  c2pa.created (Custom Content Credentials)
-                                </option>
-                                <option value="c2pa.created (Authored by Human)">
-                                  c2pa.created (Authored by Human)
-                                </option>
-                                <option value="c2pa.edited (Modified & Retouched)">
-                                  c2pa.edited (Modified & Retouched)
-                                </option>
-                                <option value="c2pa.anonymized (Privacy Protected)">
-                                  c2pa.anonymized (Privacy Protected)
-                                </option>
-                              </select>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
                       <div className="pt-2 flex items-center justify-between">
                         <span className="text-xs text-[var(--muted)] font-mono">
-                          Wipes legacy OpenAI/Adobe C2PA signatures
+                          Existing C2PA-compatible markers are removed; no replacement signature is created.
                         </span>
                         <button
                           type="button"
@@ -1023,17 +869,17 @@ export function MetadataWorkspace() {
         </div>
       )}
 
-      {/* MODAL: BULK RE-SIGN / EDIT C2PA FOR ALL FILES */}
+      {/* MODAL: BULK STANDARD METADATA EDIT */}
       {showBulkEditModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[var(--panel)] border border-[var(--line)] rounded-3xl p-6 sm:p-8 max-w-xl w-full shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--line)]">
               <div>
                 <h3 className="font-headline font-bold text-lg text-[var(--text)]">
-                  Bulk Re-Sign C2PA & Metadata ({items.length} files)
+                  Bulk Edit Metadata ({items.length} files)
                 </h3>
                 <p className="text-xs text-[var(--muted)]">
-                  Applies custom credentials to all uploaded files at once.
+                  Applies standard author, title, software, and copyright fields to all images.
                 </p>
               </div>
               <button
@@ -1051,7 +897,7 @@ export function MetadataWorkspace() {
                 <input
                   type="text"
                   value={bulkFields.Author}
-                  onChange={(e) => setBulkFields({ ...bulkFields, Author: e.target.value, c2paSigner: e.target.value })}
+                  onChange={(e) => setBulkFields({ ...bulkFields, Author: e.target.value })}
                   className="input-field text-xs font-mono"
                 />
               </div>
@@ -1060,39 +906,17 @@ export function MetadataWorkspace() {
                 <input
                   type="text"
                   value={bulkFields.Software}
-                  onChange={(e) => setBulkFields({ ...bulkFields, Software: e.target.value, c2paGenerator: e.target.value })}
+                  onChange={(e) => setBulkFields({ ...bulkFields, Software: e.target.value })}
                   className="input-field text-xs font-mono"
                 />
               </div>
               <div className="space-y-1">
-                <label className="font-semibold text-[var(--muted)]">C2PA Signer / Issuer</label>
-                <input
-                  type="text"
-                  value={bulkFields.c2paSigner}
-                  onChange={(e) => setBulkFields({ ...bulkFields, c2paSigner: e.target.value })}
-                  className="input-field text-xs font-mono"
-                />
+                <label className="font-semibold text-[var(--muted)]">Title</label>
+                <input type="text" value={bulkFields.Title} onChange={(e) => setBulkFields({ ...bulkFields, Title: e.target.value })} className="input-field text-xs font-mono" />
               </div>
               <div className="space-y-1">
-                <label className="font-semibold text-[var(--muted)]">Claim Action</label>
-                <select
-                  value={bulkFields.c2paAction}
-                  onChange={(e) => setBulkFields({ ...bulkFields, c2paAction: e.target.value })}
-                  className="input-field text-xs font-mono bg-[var(--surface-sunken)]"
-                >
-                  <option value="c2pa.created (Custom Content Credentials)">
-                    c2pa.created (Custom Content Credentials)
-                  </option>
-                  <option value="c2pa.created (Authored by Human)">
-                    c2pa.created (Authored by Human)
-                  </option>
-                  <option value="c2pa.edited (Modified & Retouched)">
-                    c2pa.edited (Modified & Retouched)
-                  </option>
-                  <option value="c2pa.anonymized (Privacy Protected)">
-                    c2pa.anonymized (Privacy Protected)
-                  </option>
-                </select>
+                <label className="font-semibold text-[var(--muted)]">Copyright</label>
+                <input type="text" value={bulkFields.Copyright} onChange={(e) => setBulkFields({ ...bulkFields, Copyright: e.target.value })} className="input-field text-xs font-mono" />
               </div>
             </div>
 

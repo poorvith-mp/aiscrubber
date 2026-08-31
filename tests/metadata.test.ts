@@ -21,53 +21,40 @@ const pngBytes = () => new Uint8Array(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAA
 const jpegBytes = () => new Uint8Array(Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQJ//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPwF//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQAGPwJ//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPyF//9oADAMBAAIAAwAAABD/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/EF//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/EF//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/EF//2Q==', 'base64'));
 
 describe('metadata engine', () => {
-  test('writes, detects, parses, and strips PNG text and C2PA chunks', async () => {
+  test('writes and parses PNG text metadata without forging C2PA credentials', async () => {
     const edited = await applyMetadataEdits(fileLike('pixel.png', 'image/png', pngBytes()), {
       Author: 'Test Author',
       Title: 'Synthetic Fixture',
-      c2paSigner: 'Fixture Authority',
-      c2paGenerator: 'AIScrubber Test',
-      signWithC2pa: true,
+      Software: 'AIScrubber Test',
     });
     const bytes = new Uint8Array(await edited.arrayBuffer());
     const file = fileLike('edited.png', 'image/png', bytes);
     const provenance = await detectC2paProvenance(file);
-    expect(provenance.signer).toBe('Fixture Authority');
+    expect(provenance.hasManifest).toBe(false);
     const analysis = await parseFileMetadata(file);
     expect(analysis.fields.some(({ value }) => value === 'Test Author')).toBe(true);
-
-    const stripped = await stripMetadataUniversal(file);
-    const strippedFile = fileLike('stripped.png', 'image/png', new Uint8Array(await stripped.arrayBuffer()));
-    expect((await detectC2paProvenance(strippedFile)).hasManifest).toBe(false);
   });
 
-  test('parses, edits, and strips PDF document metadata', async () => {
+  test('inspects PDF metadata without rewriting PDF bytes', async () => {
     const source = new TextEncoder().encode('%PDF-1.4 /Info 2 0 R /Author (Alice) /Creator (Tool) /Producer (PDF) /Title (Draft) /CreationDate (Now)');
     const file = fileLike('draft.pdf', 'application/pdf', source);
     const analysis = await parseFileMetadata(file);
     expect(analysis.threats).toContain('PDF Author exposed: Alice');
     const edited = await applyMetadataEdits(file, { Author: 'Bob', Title: 'Clean', Software: 'AIScrubber' });
-    expect(new TextDecoder().decode(await edited.arrayBuffer())).toContain('/Author (Bob)');
+    expect(new Uint8Array(await edited.arrayBuffer())).toEqual(source);
     const stripped = await stripMetadataUniversal(file);
-    const text = new TextDecoder().decode(await stripped.arrayBuffer());
-    expect(text).toContain('/Author ()');
-    expect(text).toContain('/Info null');
+    expect(new Uint8Array(await stripped.arrayBuffer())).toEqual(source);
   });
 
-  test('maps standard provenance signatures and embedded prompts', async () => {
-    const fixtures = [
-      ['OpenAI prompt: private scene', 'OpenAI Inc.'],
-      ['Nano Banana prompt: private scene', 'Nano Banana CA'],
-      ['Adobe Firefly prompt: private scene', 'Adobe Inc. (Content Authenticity Initiative)'],
-      ['Google SynthID prompt: private scene', 'Google LLC'],
-      ['Midjourney prompt: private scene', 'Midjourney Inc.'],
-      ['c2pa prompt: private scene', 'Verified C2PA Signing Authority'],
-    ];
-    for (const [source, signer] of fixtures) {
-      const provenance = await detectC2paProvenance(fileLike('artifact.bin', 'application/octet-stream', new TextEncoder().encode(source)));
-      expect(provenance.signer).toBe(signer);
-      expect(provenance.aiPrompt).toBe('private scene');
-    }
+  test('does not treat vendor names or arbitrary text as C2PA credentials', async () => {
+    const source = 'OpenAI Adobe Google SynthID c2pa prompt: private scene';
+    const provenance = await detectC2paProvenance(
+      fileLike('notes.txt', 'text/plain', new TextEncoder().encode(source))
+    );
+    expect(provenance.hasManifest).toBe(false);
+    expect(provenance.signer).toBeNull();
+    expect(provenance.aiPrompt).toBeNull();
+
     const clean = await detectC2paProvenance(fileLike('plain.bin', 'application/octet-stream', new Uint8Array([1, 2, 3])));
     expect(clean.hasManifest).toBe(false);
     expect(clean.signatureDigest).toBeNull();
@@ -105,12 +92,12 @@ describe('metadata engine', () => {
     warning.mockRestore();
   });
 
-  test('recognizes embedded custom provenance and can omit a new PNG signature', async () => {
+  test('does not recognize arbitrary JSON as signed provenance', async () => {
     const json = '{"issuer":"Local Authority","generator":"Fixture","title":"Draft","action":"created"}';
     const provenance = await detectC2paProvenance(fileLike('payload.bin', 'application/octet-stream', new TextEncoder().encode(json)));
-    expect(provenance).toMatchObject({ signer: 'Local Authority', generator: 'Fixture', aiPrompt: 'Draft' });
+    expect(provenance.hasManifest).toBe(false);
 
-    const edited = await applyMetadataEdits(fileLike('plain.png', 'image/png', pngBytes()), { signWithC2pa: false, Author: '', Title: '' });
+    const edited = await applyMetadataEdits(fileLike('plain.png', 'image/png', pngBytes()), { Author: '', Title: '' });
     const editedFile = fileLike('plain.png', 'image/png', new Uint8Array(await edited.arrayBuffer()));
     expect((await detectC2paProvenance(editedFile)).hasManifest).toBe(false);
   });
@@ -128,15 +115,17 @@ describe('metadata engine', () => {
     jpeg.set(payload, 6);
     jpeg.set([0xff, 0xd9], 6 + payload.length);
     const found = await detectC2paProvenance(fileLike('fixture.jpg', 'image/jpeg', jpeg));
-    expect(found).toMatchObject({ signer: 'JPEG Authority', generator: 'Fixture Camera', aiPrompt: 'JPEG Prompt' });
+    expect(found.hasManifest).toBe(true);
+    expect(found.signer).toBeNull();
+    expect(found.signatureDigest).toBeNull();
 
     const malformed = new Uint8Array([0xff, 0xd8, 0xff, 0xeb, 0, 8, 1, 2, 3, 4, 0xff, 0xd9]);
     const fallback = await detectC2paProvenance(fileLike('broken.jpg', 'image/jpeg', malformed));
     expect(fallback.hasManifest).toBe(true);
-    expect(fallback.signer).toBe('Verified C2PA Signing Authority');
+    expect(fallback.signer).toBeNull();
   });
 
-  test('edits and strips JPEG EXIF and APP11 provenance through the browser file boundary', async () => {
+  test('edits JPEG EXIF without forging provenance and strips existing APP11 markers', async () => {
     class FixtureFileReader {
       result: string | ArrayBuffer | null = null;
       onload: (() => void) | null = null;
@@ -154,16 +143,14 @@ describe('metadata engine', () => {
       Author: 'JPEG Author',
       Title: 'JPEG Title',
       Software: 'AIScrubber Test',
-      c2paSigner: 'JPEG Test Authority',
-      signWithC2pa: true,
     });
     const editedFile = fileLike('edited.jpg', 'image/jpeg', new Uint8Array(await edited.arrayBuffer()));
-    expect((await detectC2paProvenance(editedFile)).signer).toBe('JPEG Test Authority');
+    expect((await detectC2paProvenance(editedFile)).hasManifest).toBe(false);
     const stripped = await stripMetadataUniversal(editedFile);
     const strippedFile = fileLike('stripped.jpg', 'image/jpeg', new Uint8Array(await stripped.arrayBuffer()));
     expect((await detectC2paProvenance(strippedFile)).hasManifest).toBe(false);
 
-    const unsigned = await applyMetadataEdits(fileLike('fallback.jpeg', '', jpegBytes()), { signWithC2pa: false });
+    const unsigned = await applyMetadataEdits(fileLike('fallback.jpeg', '', jpegBytes()), {});
     expect((await detectC2paProvenance(fileLike('unsigned.jpeg', '', new Uint8Array(await unsigned.arrayBuffer())))).hasManifest).toBe(false);
   });
 
@@ -182,13 +169,13 @@ describe('metadata engine', () => {
   test('uses filename fallbacks when browsers omit MIME types', async () => {
     const png = fileLike('fallback.PNG', '', pngBytes());
     const editedPng = await applyMetadataEdits(png, {});
-    expect((await detectC2paProvenance(fileLike('fallback.PNG', '', new Uint8Array(await editedPng.arrayBuffer())))).hasManifest).toBe(true);
+    expect((await detectC2paProvenance(fileLike('fallback.PNG', '', new Uint8Array(await editedPng.arrayBuffer())))).hasManifest).toBe(false);
     expect((await stripMetadataUniversal(png)).type).toBe('image/png');
 
     const pdf = fileLike('fallback.pdf', '', new TextEncoder().encode('%PDF /Author (A) /Creator (B) /Title (C)'));
     expect((await parseFileMetadata(pdf)).fields.length).toBe(3);
-    expect((await applyMetadataEdits(pdf, {})).type).toBe('application/pdf');
-    expect((await stripMetadataUniversal(pdf)).type).toBe('application/pdf');
+    expect(await applyMetadataEdits(pdf, {})).toBe(pdf);
+    expect(await stripMetadataUniversal(pdf)).toBe(pdf);
   });
 
   test('falls back when image canvas creation fails and returns a clean re-encode when it succeeds', async () => {
@@ -221,4 +208,30 @@ describe('metadata engine', () => {
     expect(await stripMetadataUniversal(source)).toBe(clean);
     expect(drawImage).toHaveBeenCalledOnce();
   });
+  test('stripWebpMetadataChunks strips EXIF and XMP chunks from WebP RIFF container', async () => {
+    const { stripWebpMetadataChunks } = await import('../src/lib/metadata');
+    // RIFF (4) + Size (4) + WEBP (4) + VP8X (18) + EXIF (16)
+    const header = Buffer.from('RIFF....WEBP', 'ascii');
+    const vp8x = Buffer.alloc(18);
+    vp8x.write('VP8X', 0, 'ascii');
+    vp8x.writeUInt32LE(10, 4); // payload length 10
+    vp8x[8] = 0x08; // EXIF bit flag set
+
+    const exif = Buffer.alloc(16);
+    exif.write('EXIF', 0, 'ascii');
+    exif.writeUInt32LE(8, 4); // payload length 8
+
+    const fullWebp = Buffer.concat([header, vp8x, exif]);
+    fullWebp.writeUInt32LE(fullWebp.length - 8, 4);
+
+    const stripped = stripWebpMetadataChunks(new Uint8Array(fullWebp));
+    const strippedBuf = Buffer.from(stripped);
+
+    expect(strippedBuf.includes(Buffer.from('EXIF'))).toBe(false);
+    expect(strippedBuf.includes(Buffer.from('VP8X'))).toBe(true);
+    // Flag bit 3 for EXIF should be cleared
+    expect(strippedBuf[20]).toBe(0x00);
+    expect(strippedBuf.readUInt32LE(4)).toBe(strippedBuf.length - 8);
+  });
+
 });

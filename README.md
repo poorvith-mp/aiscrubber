@@ -1,106 +1,39 @@
-<div align="center">
-  <img src="docs/assets/logo.svg" width="80" alt="AIScrubber Logo" />
-  <h1>AIScrubber</h1>
-  <p><b>Next-Gen Browser-Local Privacy Desk, Developer CLI & Model Context Protocol (MCP) Server</b></p>
+# AIScrubber
 
-  <p>
-    <a href="https://aiscrubber.poorvithmp.com"><b>🌐 Live Web Suite</b></a> ·
-    <a href="#cli-quickstart"><b>💻 CLI Reference</b></a> ·
-    <a href="#mcp-server-setup"><b>🤖 MCP Server Setup</b></a> ·
-    <a href="#core-features"><b>✨ 5 Privacy Engines</b></a> ·
-    <a href="https://poorvithmp.com"><b>👨‍💻 Founder</b></a>
-  </p>
-</div>
+AIScrubber is a browser-local privacy toolkit for cleaning sensitive text and images before they are shared with an AI service, issue tracker, or another person.
 
----
+[Open the web app](https://aiscrubber.poorvithmp.com) · [Report a bug](https://github.com/poorvith-mp/aiscrubber/issues)
 
-## 🔒 What is AIScrubber?
+## What it does
 
-**AIScrubber** is an offline-capable, browser-local privacy desk and developer toolkit engineered for the exact moment before sensitive data travels to AI frontier models (ChatGPT, Claude, Gemini), public GitHub issues, or email threads.
+- Text Scrubber replaces detected credentials, email addresses, IP addresses, payment cards, IDs, and other sensitive values with stable tokens.
+- Prompt Masker exports a local session key so placeholders in an AI response can be restored later.
+- Unicode Cleaner removes selected zero-width characters, Tag Plane tokens, unusual spaces, and confusables. Optional phrase rules clean common AI-style copy patterns.
+- Metadata Desk inspects JPEG, PNG, and WebP images and removes supported EXIF, GPS, PNG text, and C2PA-compatible metadata markers.
+- Media Redactor permanently burns blur, pixelation, or blackout regions into an exported image.
 
-All user-provided content is processed in local memory and is never uploaded to AIScrubber. The website does not run page analytics. It fetches the public GitHub star count, and that request contains no text, prompts, files, or redaction data.
+The browser tools process user content in local memory. The site fetches the repository's public GitHub star count, but no pasted text, files, mappings, or session keys are sent with that request.
 
----
+## Use the CLI
 
-## ✨ 5 Dedicated Privacy Engines
-
-### 1. 📝 Text Scrubber
-- Scans input text and incident logs against **9 built-in detector classes**: email, phone, validated IPv4/IPv6, URLs, Luhn-valid payment cards, provider credentials, system IDs, US SSNs, and Verhoeff-valid Aadhaar/PAN formats.
-- Recognizes OpenAI, GitHub, Stripe, Google, GitLab, SendGrid, npm, Slack, AWS, JWT, bearer-token, and private-key credential shapes without matching split-line fragments.
-- Supports **Custom Keyword & Regex Rules** drawer.
-- Interactive side-by-side **Diff Inspector** with token tooltips.
-- 1-Click **Dictionary Key Export** for reversible token tracking.
-
-### 2. 🤖 Prompt Enhancer & Zero-Exposure Roundtrip
-- **Step 1 (Mask & Structure):** Detects credentials and endpoints in raw prompts and replaces them with semantic constants (`{{API_SECRET_1}}`, `{{DATABASE_URL_1}}`).
-- **Step 2 (Key Export):** Exports a downloadable `.aiscrub.json` session key.
-- **Step 3 (Query AI):** Paste the masked prompt to ChatGPT or Claude.
-- **Step 4 (1-Click Reconstruct):** Paste the AI's generated response and session key to unmask all original variables back into working code.
-
-### 3. ✨ AI Text & Claude Watermark Remover
-- Strips invisible Unicode zero-width watermarks (`\u200B`, `\u200C`, `\u200D`, `\uFEFF`, `\u2060`) embedded in Anthropic Claude & LLM outputs.
-- Normalizes non-standard synthetic spaces (En, Em, Thin, Hair, Narrow No-Break, Fullwidth spaces).
-- Reverts confusable Cyrillic/mathematical homoglyphs to Latin standards.
-- 4 Modes: *Aggressive (All Tiers)*, *Claude & LLM Output Clean*, *Code Safe (Preserves Indentation)*, and *Invisible Unicode Only*.
-
-### 4. 🖼️ Metadata & C2PA Provenance Desk
-- In-browser parsing of JPEG (EXIF/GPS/IPTC/XMP), PNG chunks (`tEXt`/`caPI`), PDF `/Info` dictionaries, and Audio ID3 tags.
-- **C2PA Content Credentials [CR] Inspector & Signer**: Detects cryptographic provenance manifests from ChatGPT (DALL·E 3), Nano Banana, Adobe Firefly, and Google Imagen, and allows custom binary tag signing.
-- **1-Click Stripper:** Re-encodes clean pixel buffers and wipes C2PA tracking fingerprints.
-
-### 5. 🎨 Visual Media Redactor
-- HTML5 Canvas interactive tool to draw redaction boxes on screenshots and images.
-- Tools: **Gaussian Blur**, **Pixelate (Mosaic)**, and **Solid Blackout**.
-- Undo/redo history stack and clean high-resolution PNG export.
-
----
-
-## 💻 CLI Quickstart & Help System
-
-Run the standalone CLI with zero installation via `npx`:
+Run it without installing globally:
 
 ```bash
-# Strip Claude & AI invisible Unicode zero-width watermarks
-npx aiscrubber clean-watermarks ./claude-output.md -o ./clean-article.md
-
-# Scrub sensitive incident logs into safe numbered labels
-npx aiscrubber scrub ./logs/production-crash.log --output ./logs/clean.log
-
-# Mask prompt secrets for AI and save session key
-npx aiscrubber mask "Connect postgres://admin:P@ssw0rd@db.internal:5432" --key session.aiscrub.json
-
-# Unmask AI response with your session key
-npx aiscrubber unmask ./ai-response.py --key session.aiscrub.json --output ./final-code.py
-
-# Inspect file or text for hidden EXIF, C2PA, or leaked API keys
-npx aiscrubber inspect ./production-dump.log
-
-# Strip metadata & C2PA manifests from documents and images
-npx aiscrubber strip-metadata ./photos/*.jpg ./reports/*.pdf
+npx aiscrubber scrub ./incident.log --output ./incident.clean.log
+npx aiscrubber mask ./prompt.txt --key ./session.aiscrub.json
+npx aiscrubber unmask ./ai-response.txt --key ./session.aiscrub.json
+npx aiscrubber clean-watermarks ./draft.md --output ./draft.clean.md
+npx aiscrubber strip-metadata ./photo.jpg ./screenshot.png
+npx aiscrubber inspect ./incident.log --json
 ```
 
-### Command-Specific Help in Terminal
+`strip-metadata` currently writes sanitized copies for JPEG and PNG files. It does not rewrite PDFs or claim to verify C2PA signatures.
 
-Get instant interactive usage instructions for any command:
+Use `npx aiscrubber help <command>` for command-specific examples.
 
-```bash
-npx aiscrubber help clean-watermarks
-npx aiscrubber help scrub
-npx aiscrubber help mask
-npx aiscrubber help unmask
-npx aiscrubber help strip-metadata
-npx aiscrubber help inspect
-```
+## Connect the MCP server
 
----
-
-## 🤖 MCP Server Setup (Claude Desktop & Cursor)
-
-Connect AIScrubber directly to **Claude Desktop**, **Claude Code CLI**, or **Cursor** as an official Model Context Protocol (MCP) server.
-
-### Claude Desktop Configuration
-
-Add the following to your `claude_desktop_config.json`:
+AIScrubber exposes `scrub_text`, `mask_prompt`, `unmask_response`, `clean_ai_watermarks`, and `inspect_content` over stdio.
 
 ```json
 {
@@ -113,38 +46,32 @@ Add the following to your `claude_desktop_config.json`:
 }
 ```
 
-### Exposed MCP Tools:
-- `clean_ai_watermarks`: Strips invisible Unicode zero-width watermarks (Anthropic Claude & ChatGPT markers), normalizes non-standard spaces, and reverts homoglyphs.
-- `scrub_text`: Sanitizes raw logs and text into `[EMAIL_1]`, `[SECRET_1]`, `[IP_1]`.
-- `mask_prompt`: Masks secrets into `{{KEY_1}}` constants and outputs session key JSON.
-- `unmask_response`: Restores original variables back into returned AI output.
-- `inspect_content`: Scans text or files for leaked credentials, API tokens, invisible watermarks, and C2PA tracking manifests.
+## Accuracy and safety boundaries
 
----
+- Detection is deterministic pattern matching, not semantic understanding. Review the output before sharing it.
+- Unicode findings do not prove which model created text or that a vendor watermark exists.
+- The Metadata Desk detects supported binary markers but does not verify cryptographic provenance signatures.
+- Keep `.aiscrub.json` session keys private. They contain the original values required for reconstruction.
+- Work on a copy of important files and verify exported images before deleting originals.
 
-## 🛡️ Security & Threat Model
+## Develop locally
 
-| Characteristic | Specification |
-|---|---|
-| **Execution Environment** | Client-Side Browser Memory / Local Node.js Process |
-| **Sensitive Content Uploads** | **0** — processing stays in browser memory or the local Node.js process |
-| **Non-content Requests** | The public GitHub star count only; no pasted text, files, mappings, or keys |
-| **Storage** | Ephemeral RAM only (LocalStorage used only for dark/light UI preference) |
-| **License** | Open Source MIT License |
+Requirements: Node.js 18 or newer.
 
----
+```bash
+npm ci
+npm test
+npm run build
+npm run dev
+```
 
-## 👨‍💻 Founder & Credits
+Deploy the built static assets to Cloudflare Workers:
 
-Designed and built by **[Poorvith M P](https://poorvithmp.com)**, 19-year-old student developer & founder based in Bengaluru, India.
+```bash
+npm run build
+npx wrangler deploy
+```
 
-- **Portfolio**: [poorvithmp.com](https://poorvithmp.com)
-- **GitHub**: [@poorvith-mp](https://github.com/poorvith-mp)
-- **X (Twitter)**: [@poorvithmp](https://x.com/poorvithmp)
-- **LinkedIn**: [linkedin.com/in/poorvithmp](https://linkedin.com/in/poorvithmp)
+## License
 
----
-
-## 📄 License
-
-Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for details.
+MIT. See [LICENSE](LICENSE).
