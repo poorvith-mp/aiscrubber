@@ -24,19 +24,20 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { AboutWorkspace } from './components/AboutWorkspace';
-import { DocsWorkspace } from './components/DocsWorkspace';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { FeedbackModal } from './components/FeedbackModal';
 import { HomeWorkspace } from './components/HomeWorkspace';
-import { LegalWorkspace } from './components/LegalWorkspace';
-import { MediaRedactorWorkspace } from './components/MediaRedactorWorkspace';
-import { MetadataWorkspace } from './components/MetadataWorkspace';
 import { PageLoader } from './components/PageLoader';
-import { PromptEnhancerWorkspace } from './components/PromptEnhancerWorkspace';
-import { ScrubberWorkspace } from './components/ScrubberWorkspace';
-import { WatermarkWorkspace } from './components/WatermarkWorkspace';
 import { NAV_GROUPS, viewForShortcut, viewFromHash, type ToolView } from './lib/navigation';
+
+const AboutWorkspace = lazy(() => import('./components/AboutWorkspace').then(({ AboutWorkspace }) => ({ default: AboutWorkspace })));
+const DocsWorkspace = lazy(() => import('./components/DocsWorkspace').then(({ DocsWorkspace }) => ({ default: DocsWorkspace })));
+const LegalWorkspace = lazy(() => import('./components/LegalWorkspace').then(({ LegalWorkspace }) => ({ default: LegalWorkspace })));
+const MediaRedactorWorkspace = lazy(() => import('./components/MediaRedactorWorkspace').then(({ MediaRedactorWorkspace }) => ({ default: MediaRedactorWorkspace })));
+const MetadataWorkspace = lazy(() => import('./components/MetadataWorkspace').then(({ MetadataWorkspace }) => ({ default: MetadataWorkspace })));
+const PromptEnhancerWorkspace = lazy(() => import('./components/PromptEnhancerWorkspace').then(({ PromptEnhancerWorkspace }) => ({ default: PromptEnhancerWorkspace })));
+const ScrubberWorkspace = lazy(() => import('./components/ScrubberWorkspace').then(({ ScrubberWorkspace }) => ({ default: ScrubberWorkspace })));
+const WatermarkWorkspace = lazy(() => import('./components/WatermarkWorkspace').then(({ WatermarkWorkspace }) => ({ default: WatermarkWorkspace })));
 
 const NAV_ICONS: Record<ToolView, React.ComponentType<{ size?: number; className?: string }>> = {
   home: Home,
@@ -111,7 +112,6 @@ export function App() {
   });
 
   const [currentView, setCurrentView] = useState<ToolView>('home');
-  const [isSwitching, setIsSwitching] = useState<boolean>(false);
   const [starCount, setStarCount] = useState<number | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -169,15 +169,10 @@ export function App() {
 
   function switchView(view: ToolView) {
     if (view === currentView) return;
-    setIsSwitching(true);
     setCurrentView(view);
     setMobileMenuOpen(false);
     window.location.hash = view;
     window.scrollTo({ top: 0, behavior: 'smooth' });
-
-    setTimeout(() => {
-      setIsSwitching(false);
-    }, 150);
   }
 
   return (
@@ -351,10 +346,7 @@ export function App() {
       {/* Main App Container (Optimized with left padding for desktop vertical dock) */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 md:pl-24 lg:pl-28 py-8 flex-1 w-full space-y-12">
         <section id="workspace" className="transition-all duration-300">
-          {isSwitching ? (
-            <PageLoader text={`Opening ${currentView.toUpperCase()} Workspace...`} />
-          ) : (
-            <>
+          <Suspense fallback={<PageLoader text={`Opening ${currentView.toUpperCase()} Workspace...`} />}>
               {currentView === 'home' && <HomeWorkspace onSelectTool={switchView} />}
               {currentView === 'scrub' && <ScrubberWorkspace />}
               {currentView === 'prompt' && <PromptEnhancerWorkspace />}
@@ -364,8 +356,7 @@ export function App() {
               {currentView === 'docs' && <DocsWorkspace />}
               {currentView === 'legal' && <LegalWorkspace />}
               {currentView === 'about' && <AboutWorkspace />}
-            </>
-          )}
+          </Suspense>
         </section>
       </main>
 

@@ -55,4 +55,18 @@ describe('watermark cleaning', () => {
     expect(cleanTextWatermarks('\u200B', DEFAULT_WATERMARK_OPTIONS).threatLevel).toBe('MEDIUM');
     expect(cleanTextWatermarks('\u200B\u200C\u200D', DEFAULT_WATERMARK_OPTIONS).threatLevel).toBe('HIGH');
   });
+
+  test('respects tag-plane and variation-selector switches in the all profile', () => {
+    const tagged = 'visible\u{E0061}\uFE0F';
+    const result = cleanTextWatermarks(tagged, {
+      ...DEFAULT_WATERMARK_OPTIONS,
+      mode: 'all',
+      stripTagPlane: false,
+      stripVariationSelectors: false,
+    });
+
+    expect(result.cleanedText).toBe(tagged);
+    expect(result.stats.tagPlaneRemoved).toBe(0);
+    expect(result.stats.variationSelectorsRemoved).toBe(0);
+  });
 });

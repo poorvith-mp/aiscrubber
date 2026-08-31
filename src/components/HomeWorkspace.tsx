@@ -23,11 +23,11 @@ interface HomeWorkspaceProps {
 }
 
 const ROTATING_PHRASES = [
-  'Stripping Anthropic Claude & AI Invisible Watermarks',
+  'Removing Invisible Unicode & Copy Artifacts',
   'Masking API Keys & Secrets for LLMs',
   'Stripping C2PA Manifests & EXIF GPS Coordinates',
   'Scrubbing PII & Bearer Tokens in Incident Logs',
-  'Sanitizing PDF Author & Editing Trails',
+  'Redacting Sensitive Details in Screenshots',
 ];
 
 export function HomeWorkspace({ onSelectTool }: HomeWorkspaceProps) {
@@ -116,7 +116,7 @@ Contact Customer: [EMAIL_1] (Card: [CARD_1])`;
           </h1>
 
           <p className="text-base sm:text-lg text-[var(--muted)] leading-relaxed max-w-2xl mx-auto">
-            The browser-local privacy desk. Strip invisible AI watermarks, mask prompt secrets with reversible constants, remove C2PA/EXIF metadata, and redact screenshots entirely in memory.
+            The browser-local privacy desk. Remove invisible Unicode artifacts, mask prompt secrets with reversible constants, clean supported image metadata, and redact screenshots in memory.
           </p>
         </div>
 
@@ -292,12 +292,12 @@ Contact Customer: [EMAIL_1] (Card: [CARD_1])`;
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold font-headline text-[var(--text)]">
-                  AI Watermark Remover
+                  AI Text Watermark & Unicode Cleaner
                 </h3>
                 <ArrowRight size={16} className="text-[var(--accent)] group-hover:translate-x-1 transition-all" />
               </div>
               <p className="text-xs text-[var(--muted)] leading-relaxed">
-                Strip Anthropic Claude invisible zero-width watermarks (`\u200B`, `\uFEFF`), normalize synthetic spaces, revert homoglyphs, and remove AI signature cadences.
+                Remove selected zero-width and Tag Plane markers (`\u200B`, `\uFEFF`), normalize synthetic spaces, flag confusables, and optionally clean AI-style copy patterns.
               </p>
             </div>
           </div>
@@ -318,7 +318,7 @@ Contact Customer: [EMAIL_1] (Card: [CARD_1])`;
                 <ArrowRight size={16} className="text-[var(--muted)] group-hover:text-[var(--accent)] group-hover:translate-x-1 transition-all" />
               </div>
               <p className="text-xs text-[var(--muted)] leading-relaxed">
-                Inspect C2PA Content Credentials (ChatGPT, DALL·E 3, Nano Banana), edit author tags, or strip 100% of EXIF/GPS data client-side.
+                Inspect C2PA-compatible markers, edit standard author tags, and remove supported EXIF/GPS metadata from images locally.
               </p>
             </div>
           </div>

@@ -305,7 +305,7 @@ export function cleanTextWatermarks(
   }
 
   // 2. Strip Tag Plane Characters (U+E0000 - U+E007F) & Variation Selectors
-  if (opts.stripTagPlane || opts.mode === 'all') {
+  if (opts.stripTagPlane) {
     const tagPlaneRegex = /\uDB40[\uDC00-\uDC7F]/g;
     const matches = cleaned.match(tagPlaneRegex);
     if (matches) {
@@ -314,7 +314,7 @@ export function cleanTextWatermarks(
     }
   }
 
-  if (opts.stripVariationSelectors || opts.mode === 'all') {
+  if (opts.stripVariationSelectors) {
     const vsRegex = /[\uFE00-\uFE0F]/g;
     const matches = cleaned.match(vsRegex);
     if (matches) {

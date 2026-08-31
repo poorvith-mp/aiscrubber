@@ -1,4 +1,7 @@
 import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { enhanceAndMaskPrompt, reconstructAiResponse } from '../src/lib/promptEnhancer';
 import { defaultDetectors, scrubText } from '../src/lib/scrub';
@@ -62,5 +65,31 @@ describe('shared scrub engine surfaces', () => {
     const result = scrubText(source, new Set(defaultDetectors.map(({ id }) => id)));
     expect(result.totalRedactions).toBeGreaterThan(1_000);
     expect(performance.now() - started).toBeLessThan(500);
+  });
+
+  test('CLI metadata stripping writes a sanitized PNG instead of reporting a no-op', () => {
+    const temp = mkdtempSync(join(tmpdir(), 'aiscrubber-'));
+    try {
+      const input = join(temp, 'pixel.png');
+      const output = join(temp, 'pixel_sanitized.png');
+      const base = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+      const iend = base.subarray(base.length - 12);
+      const body = base.subarray(0, base.length - 12);
+      const text = Buffer.from('Author\0Private');
+      const chunk = Buffer.alloc(12 + text.length);
+      chunk.writeUInt32BE(text.length, 0);
+      chunk.write('tEXt', 4, 'ascii');
+      text.copy(chunk, 8);
+      writeFileSync(input, Buffer.concat([body, chunk, iend]));
+
+      const cli = spawnSync(process.execPath, ['bin/aiscrubber.js', 'strip-metadata', input], {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+      });
+      expect(cli.status).toBe(0);
+      expect(readFileSync(output).includes(Buffer.from('tEXt'))).toBe(false);
+    } finally {
+      rmSync(temp, { recursive: true, force: true });
+    }
   });
 });

@@ -205,7 +205,7 @@ export function AboutWorkspace() {
           </div>
           <h4 className="font-bold text-sm text-[var(--text)]">Multi-Format Metadata Desk</h4>
           <p className="text-xs text-[var(--muted)] leading-relaxed">
-            Inspect and scrub hidden EXIF GPS tags, camera identifiers, and PDF/audio author streams without quality loss.
+            Inspect and remove supported EXIF GPS tags, camera identifiers, PNG text, and C2PA-compatible image markers locally.
           </p>
         </div>
 
