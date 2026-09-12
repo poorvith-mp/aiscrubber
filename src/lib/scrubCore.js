@@ -14,6 +14,116 @@ const VERHOEFF_P = [
   [2,7,9,3,8,0,6,4,1,5],[7,0,4,6,9,1,3,2,5,8],
 ];
 
+export const SECRET_PREFIXES = [
+  'ghp_',
+  'gho_',
+  'github_pat_',
+  'sk-',
+  'sk_',
+  'pk_',
+  'rk_',
+  'AIza',
+  'glpat-',
+  'SG.',
+  'npm_',
+  'xapp-',
+  'xox',
+  'AKIA',
+];
+
+const SECRET_CONTEXT_BEFORE = /(?:Bearer\s+|token\s*[:=]\s*|key\s*[:=]\s*|secret\s*[:=]\s*|passwd\s*[:=]\s*|password\s*[:=]\s*|auth_key\s*[:=]\s*|aws_secret_access_key\s*[:=]\s*|SESSION_TOKEN\s*[:=]\s*|DB_PASS\s*[:=]\s*)["']?$/i;
+
+export function calculateShannonEntropy(str) {
+  if (!str) return 0;
+  const freq = new Map();
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    freq.set(ch, (freq.get(ch) || 0) + 1);
+  }
+  let bits = 0;
+  for (const count of freq.values()) {
+    const p = count / str.length;
+    bits -= p * Math.log2(p);
+  }
+  return bits;
+}
+
+export function applyEntropyFilters(candidate, context = { before: '', after: '' }, allowlist = []) {
+  if (!candidate) return false;
+
+  // E5_allowlist: user allowlist drops candidates
+  if (Array.isArray(allowlist)) {
+    for (const rule of allowlist) {
+      if (!rule || !rule.value) continue;
+      if (rule.isRegex) {
+        try {
+          if (new RegExp(rule.value, 'i').test(candidate)) return false;
+        } catch {}
+      } else if (candidate === rule.value) {
+        return false;
+      }
+    }
+  }
+
+  // Prefix check: known secret prefixes always beat E1..E6
+  if (SECRET_PREFIXES.some((prefix) => candidate.startsWith(prefix))) {
+    return true;
+  }
+
+  const beforeSlice = (context && context.before) ? context.before.slice(-24) : '';
+  const hasSecretContext = SECRET_CONTEXT_BEFORE.test(beforeSlice);
+
+  // E6_repeat_char: one char class only
+  if (/^(.)\1{3,}$/.test(candidate)) {
+    return false;
+  }
+
+  // E3_base64_media: candidate length > 512 preceded by data:image/ or ;base64,
+  if (candidate.length > 512 && context && context.before) {
+    const prev40 = context.before.slice(-40);
+    if (prev40.includes('data:image/') || prev40.includes(';base64,')) {
+      return false;
+    }
+  }
+
+  // E2_uuid: RFC 4122 UUID (any standard 8-4-4-4-12 hex representation)
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(candidate)) {
+    return false;
+  }
+
+  // E1_hex_sha: 7 to 64 hex chars or digests / memory addresses
+  if (/^(?:0x)?[0-9a-f]{7,64}$/i.test(candidate) || /^(?:sha\d{3}|md5|git)-[0-9a-f]+$/i.test(candidate)) {
+    if (!hasSecretContext) {
+      return false;
+    }
+    return true;
+  }
+
+  // Kebab/snake case word identifiers
+  if (/^[a-z]+(?:[-_][a-z]+)+(?:-\d+)?$/i.test(candidate) && !hasSecretContext) {
+    return false;
+  }
+
+  // E4_known_word_ratio: >= 40% of 4-gram windows are dictionary-like
+  if (candidate.length >= 4 && !hasSecretContext) {
+    const lower = candidate.toLowerCase();
+    let totalWindows = 0;
+    let wordWindows = 0;
+    for (let i = 0; i <= lower.length - 4; i++) {
+      const quad = lower.slice(i, i + 4);
+      totalWindows++;
+      if (/^[a-z]{4}$/.test(quad) && /[aeiou]/.test(quad)) {
+        wordWindows++;
+      }
+    }
+    if (totalWindows > 0 && (wordWindows / totalWindows) >= 0.4) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export const detectorDefinitions = [
   { id: 'email', label: 'Email addresses', token: 'EMAIL', description: 'Personal and work email addresses', patterns: [/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi] },
   { id: 'phone', label: 'Phone numbers', token: 'PHONE', description: 'Indian and international telephone numbers', patterns: [/(?<!\d)(?:\+91[ .-]?)?[6-9]\d{4}[ .-]?\d{5}(?!\d)/g, /(?<!\w)\+?\d{1,3}[ .-]\(?\d{2,4}\)?[ .-]\d{3,4}[ .-]\d{4}(?!\w)/g] },
@@ -35,12 +145,20 @@ export const detectorDefinitions = [
     /\bAKIA[0-9A-Z]{16}\b/g,
     /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g,
     /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g,
-    /\b(?:aws_secret_access_key|secret)\s*[:=]\s*([A-Za-z0-9/+=]{40})\b/gi,
-    /\b(?:password|passwd|pwd|api_key|token|auth_key)\s*[:=]\s*["']?([^\s"';,]+)["']?/gi,
+    /\b(?:aws_secret_access_key|secret)\s*[:=]\s*["']?([A-Za-z0-9/+=]{40})["']?/gi,
+    /\b(?:password|passwd|pwd|api_key|token|auth_key|secret|pass|db_pass)\s*[:=]\s*["']?([^\s"';,\r\n]+)["']?/gi,
   ], capture: (match) => match[1] || match[0] },
   { id: 'identifier', label: 'Selected IDs', token: 'ID', description: 'Account, customer, client, and order identifiers', patterns: [/\b(?:CUST|USER|ACCOUNT|ORDER|CLIENT|INVOICE|EMP|ORG)[-_][A-Z0-9]{4,}\b/gi] },
   { id: 'ssn_dob', label: 'US Social Security numbers', token: 'GOV_ID', description: 'US Social Security number format', patterns: [/\b\d{3}-\d{2}-\d{4}\b/g] },
-  { id: 'national_id_in', label: 'India IDs', token: 'INDIA_ID', description: 'Verhoeff-valid Aadhaar and PAN formats', patterns: [/(?<!\d)(?:\d{4}[ -]?){2}\d{4}(?!\d)/g, /\b[A-Z]{5}\d{4}[A-Z]\b/g], validate: (value) => /[A-Z]/i.test(value) || isVerhoeffValid(value) },
+  { id: 'national_id_in', label: 'India IDs', token: 'INDIA_ID', description: 'Verhoeff-valid Aadhaar and PAN formats', patterns: [/(?<![\w-])(?:\d{4}[ -]?){2}\d{4}(?![\w-])/g, /\b[A-Z]{5}\d{4}[A-Z]\b/g], validate: (value) => /[A-Z]/i.test(value) || isVerhoeffValid(value) },
+  { id: 'entropy', label: 'High-entropy strings', token: 'SECRET', description: 'High-entropy strings, tokens, and candidate secrets', patterns: [/(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{7,}(?![A-Za-z0-9_-])/g], validate: (value) => {
+    if (value.length < 7) return false;
+    if (/^[0-9a-f]{7,64}$/i.test(value)) return true;
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) return true;
+    if (/^(.)\1{3,}$/.test(value)) return true;
+    if (value.length >= 16) return true;
+    return false;
+  }},
 ];
 
 export function isLuhnValid(value) {
@@ -82,8 +200,9 @@ export function isValidIpv6(value) {
   return halves.length === 2 ? left.length + right.length < 8 : left.length === 8;
 }
 
-export function collectBuiltInMatches(source, enabledIds = new Set(detectorDefinitions.map(({ id }) => id))) {
+export function collectBuiltInMatches(source, enabledIds = new Set(detectorDefinitions.map(({ id }) => id)), options = {}) {
   const matches = [];
+  let entropySuppressed = 0;
   for (const detector of detectorDefinitions) {
     if (!enabledIds.has(detector.id)) continue;
     for (const pattern of detector.patterns) {
@@ -93,15 +212,39 @@ export function collectBuiltInMatches(source, enabledIds = new Set(detectorDefin
         const value = detector.capture ? detector.capture(match) : match[0];
         if (!value || (detector.validate && !detector.validate(value))) continue;
         const relative = match[0].indexOf(value);
-        matches.push({ start: match.index + relative, end: match.index + relative + value.length, value, token: detector.token, detectorId: detector.id });
+        const start = match.index + relative;
+        const end = start + value.length;
+
+        if (detector.id === 'entropy') {
+          if (options.suppressEntropy !== false) {
+            const context = {
+              before: source.slice(Math.max(0, start - 40), start),
+              after: source.slice(end, Math.min(source.length, end + 40)),
+            };
+            if (!applyEntropyFilters(value, context, options.allowlist || [])) {
+              entropySuppressed++;
+              continue;
+            }
+          }
+        }
+
+        matches.push({ start, end, value, token: detector.token, detectorId: detector.id });
       }
     }
   }
+  matches.entropySuppressed = entropySuppressed;
   return matches;
 }
 
-export function tokenizeMatches(source, inputMatches) {
-  const sorted = [...inputMatches].sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
+export function tokenizeMatches(source, inputMatches, options = {}) {
+  const sorted = [...inputMatches].sort((a, b) => {
+    if (a.start !== b.start) return a.start - b.start;
+    if (a.end !== b.end) return (b.end - b.start) - (a.end - a.start);
+    const aCustom = a.detectorId.startsWith('custom_');
+    const bCustom = b.detectorId.startsWith('custom_');
+    if (aCustom !== bCustom) return aCustom ? -1 : 1;
+    return 0;
+  });
   const accepted = [];
   for (const match of sorted) {
     if (!accepted.some((item) => match.start < item.end && match.end > item.start)) accepted.push(match);
@@ -140,10 +283,46 @@ export function tokenizeMatches(source, inputMatches) {
     text += trailing;
     diffSegments.push({ type: 'unchanged', text: trailing });
   }
+
+  const suppressed = options.entropySuppressed ?? inputMatches.entropySuppressed ?? 0;
+  if (suppressed > 0 || options.suppressEntropy !== false) {
+    counts['entropy-suppressed'] = suppressed;
+  }
+
   return { text, counts, mappings, diffSegments, totalRedactions: accepted.length };
 }
 
-export function scrubBuiltIns(source, enabledIds) {
+export function collectCustomMatches(source, customRules = []) {
+  const matches = [];
+  for (const rule of customRules) {
+    if (!rule.enabled || !rule.patternString?.trim()) continue;
+    try {
+      if (rule.isRegex) {
+        const regex = new RegExp(rule.patternString, 'gi');
+        for (const match of source.matchAll(regex)) {
+          if (match.index === undefined || !match[0]) continue;
+          matches.push({ start: match.index, end: match.index + match[0].length, value: match[0], token: rule.token || 'CUSTOM', detectorId: `custom_${rule.id}` });
+        }
+      } else {
+        const lower = source.toLowerCase();
+        const target = rule.patternString.toLowerCase();
+        let pos = 0;
+        while ((pos = lower.indexOf(target, pos)) !== -1) {
+          matches.push({ start: pos, end: pos + target.length, value: source.slice(pos, pos + target.length), token: rule.token || 'CUSTOM', detectorId: `custom_${rule.id}` });
+          pos += target.length;
+        }
+      }
+    } catch {}
+  }
+  return matches;
+}
+
+export function scrubBuiltIns(source, enabledIds, options = {}) {
   if (!source) return { text: '', counts: {}, mappings: [], diffSegments: [], totalRedactions: 0 };
-  return tokenizeMatches(source, collectBuiltInMatches(source, enabledIds));
+  const matches = collectBuiltInMatches(source, enabledIds, options);
+  if (options.customRules && options.customRules.length > 0) {
+    const customMatches = collectCustomMatches(source, options.customRules);
+    matches.push(...customMatches);
+  }
+  return tokenizeMatches(source, matches, { ...options, entropySuppressed: matches.entropySuppressed });
 }

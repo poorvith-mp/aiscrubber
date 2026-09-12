@@ -1,11 +1,13 @@
-import { collectBuiltInMatches, detectorDefinitions, tokenizeMatches, type CoreMatch } from './scrubCore.js';
+import { collectBuiltInMatches, detectorDefinitions, tokenizeMatches, type CoreMatch, type AllowRule } from './scrubCore.js';
 
 export type DetectorId = import('./scrubCore.js').DetectorId;
+export type { AllowRule };
 export interface Detector { id: DetectorId; label: string; token: string; description: string; pattern: RegExp; }
 export interface CustomRule { id: string; label: string; token: string; patternString: string; isRegex: boolean; enabled: boolean; }
 export interface TokenMapping { token: string; original: string; detectorId: string; count: number; }
 export interface DiffSegment { type: 'unchanged' | 'redacted'; text: string; originalValue?: string; token?: string; detector?: string; }
 export interface ScrubResult { text: string; counts: Record<string, number>; mappings: TokenMapping[]; diffSegments: DiffSegment[]; totalRedactions: number; }
+export interface ScrubOptions { allowlist?: AllowRule[]; suppressEntropy?: boolean; }
 
 export const defaultDetectors: Detector[] = detectorDefinitions.map((detector) => ({
   id: detector.id,
@@ -15,9 +17,14 @@ export const defaultDetectors: Detector[] = detectorDefinitions.map((detector) =
   pattern: detector.patterns[0],
 }));
 
-export function scrubText(source: string, enabledDetectorIds: Set<DetectorId>, customRules: CustomRule[] = []): ScrubResult {
+export function scrubText(
+  source: string,
+  enabledDetectorIds: Set<DetectorId>,
+  customRules: CustomRule[] = [],
+  options: ScrubOptions = {}
+): ScrubResult {
   if (!source) return { text: '', counts: {}, mappings: [], diffSegments: [], totalRedactions: 0 };
-  const matches: CoreMatch[] = collectBuiltInMatches(source, enabledDetectorIds);
+  const matches: CoreMatch[] = collectBuiltInMatches(source, enabledDetectorIds, options);
   for (const rule of customRules) {
     if (!rule.enabled || !rule.patternString.trim()) continue;
     try {
@@ -40,7 +47,10 @@ export function scrubText(source: string, enabledDetectorIds: Set<DetectorId>, c
       // Invalid custom expressions are ignored while the user is editing them.
     }
   }
-  return tokenizeMatches(source, matches);
+  return tokenizeMatches(source, matches, {
+    ...options,
+    entropySuppressed: (matches as any).entropySuppressed ?? 0,
+  });
 }
 
 export function restoreTextWithMapping(redactedText: string, mappings: { token: string; original: string }[]): string {

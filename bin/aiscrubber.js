@@ -9,8 +9,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { detectorDefinitions, scrubBuiltIns } from '../src/lib/scrubCore.js';
+import { streamScrubFile } from './lib/streamScrub.js';
+import { runCheck } from './lib/checkCommand.js';
+import { loadConfig } from './lib/rulesLoader.js';
 
-const VERSION = '2.3.0';
+const VERSION = '2.4.0';
 
 const HOMOGLYPH_MAP = {
   'а': 'a', 'А': 'A', 'с': 'c', 'С': 'C', 'е': 'e', 'Е': 'E', 'о': 'o', 'О': 'O',
@@ -45,6 +48,7 @@ Local-processing privacy suite for developer prompts, crash logs, and files.
   $ cat incident.log | npx aiscrubber scrub
 
 \x1b[1mCOMMANDS\x1b[0m
+  \x1b[36mcheck\x1b[0m [paths...] [--staged]      Scan files or git staged diff for credentials pre-commit
   \x1b[36mclean-watermarks\x1b[0m <file | text>  Remove selected invisible Unicode and copy artifacts
   \x1b[36mscrub\x1b[0m <file | text>             Scrub PII, tokens, and secrets into numbered labels
   \x1b[36mmask\x1b[0m <file | prompt>            Mask secrets with constants and generate a session key
@@ -57,10 +61,13 @@ Local-processing privacy suite for developer prompts, crash logs, and files.
   -o, --output <path>            Write output to a specific file instead of stdout
   -k, --key <path>               Path to .aiscrub.json session key (used by mask & unmask)
   -j, --json                     Output structured JSON with replacements and metadata
+  --config <path>                Path to .aiscrubrc.json rule configuration
+  --no-suppress                  Disable entropy filters and allowlist suppression
   -h, --help                     Show general help or command-specific help
   -v, --version                  Show CLI version
 
 \x1b[1mGET HELP ON A SPECIFIC COMMAND\x1b[0m
+  $ npx aiscrubber help check
   $ npx aiscrubber help clean-watermarks
   $ npx aiscrubber help scrub
   $ npx aiscrubber help mask
@@ -73,6 +80,31 @@ Local-processing privacy suite for developer prompts, crash logs, and files.
 
 function printCommandHelp(cmd) {
   switch (cmd) {
+    case 'check':
+      console.log(`
+\x1b[1mCOMMAND: check\x1b[0m
+Scans specified files, directories, or git-staged changes against sensitive detectors and custom rules.
+Designed for use in CI pipelines and pre-commit hooks.
+
+\x1b[1mUSAGE\x1b[0m
+  $ npx aiscrubber check [paths...] [options]
+  $ npx aiscrubber check --staged
+  $ cat test.txt | npx aiscrubber check
+
+\x1b[1mOPTIONS\x1b[0m
+  --staged               Scan only git staged changes (ACM)
+  -j, --json             Emit findings as JSON
+  --config <path>        Path to explicit .aiscrubrc.json
+  --no-suppress          Disable entropy suppression
+  --verbose              Show verbose skip/progress messages
+
+\x1b[1mEXIT CODES\x1b[0m
+  0                      No secrets found (clean)
+  1                      Exposed secrets or credentials found
+  2                      Usage or configuration error
+`);
+      break;
+
     case 'clean-watermarks':
     case 'watermark':
       console.log(`
@@ -97,8 +129,8 @@ non-standard whitespace, homoglyphs, and AI stylometric clichés from Claude & L
     case 'scrub':
       console.log(`
 \x1b[1mCOMMAND: scrub\x1b[0m
-Scans text or incident logs against 9 sensitive detector classes, including provider secrets, validated
-IP addresses, payment cards, Indian IDs, and system identifiers, then replaces them with numbered tokens.
+Scans text or incident logs against sensitive detector classes, including provider secrets, validated
+IP addresses, payment cards, Indian IDs, entropy candidates, and system identifiers, then replaces them with numbered tokens.
 
 \x1b[1mUSAGE\x1b[0m
   $ npx aiscrubber scrub <file | text> [options]
@@ -106,6 +138,10 @@ IP addresses, payment cards, Indian IDs, and system identifiers, then replaces t
 
 \x1b[1mOPTIONS\x1b[0m
   -o, --output <path>    Write scrubbed output to file
+  --stdout               Force streaming output to stdout
+  --stream               Stream file in chunks (auto-enabled for files >64 MiB)
+  --config <path>        Path to .aiscrubrc.json rule configuration
+  --no-suppress          Disable entropy suppression
   -j, --json             Print structured replacement dictionary JSON
 
 \x1b[1mEXAMPLES\x1b[0m
@@ -270,8 +306,8 @@ function cleanWatermarks(content) {
 }
 
 // Scrub Text
-function scrubText(content) {
-  const result = scrubBuiltIns(content);
+function scrubText(content, options = {}) {
+  const result = scrubBuiltIns(content, undefined, options);
   return {
     scrubbed: result.text,
     mappings: Object.fromEntries(result.mappings.map(({ original, token }) => [original, token])),
@@ -281,8 +317,8 @@ function scrubText(content) {
 }
 
 // Mask Prompt for AI
-function maskPrompt(prompt) {
-  const scrubbed = scrubBuiltIns(prompt);
+function maskPrompt(prompt, options = {}) {
+  const scrubbed = scrubBuiltIns(prompt, undefined, options);
   let masked = scrubbed.text;
   const sessionKey = {
     id: `aiscrub_${Date.now()}`,
@@ -317,7 +353,7 @@ function unmaskResponse(aiContent, sessionKeyObj) {
 }
 
 // Inspect File / Content
-function inspectContent(target) {
+function inspectContent(target, options = {}) {
   const isFile = fs.existsSync(target);
   let content = target;
   let fileStats = null;
@@ -332,10 +368,17 @@ function inspectContent(target) {
   const details = {};
 
   // Check text detectors
-  const scrubbed = scrubBuiltIns(content);
+  const scrubbed = scrubBuiltIns(content, undefined, options);
   for (const detector of detectorDefinitions) {
     const count = scrubbed.counts[detector.id] || 0;
     if (count) threats.push(`${detector.label} exposed (${count} instance${count > 1 ? 's' : ''})`);
+  }
+
+  if (options.customRules) {
+    for (const rule of options.customRules) {
+      const count = scrubbed.counts[`custom_${rule.id}`] || 0;
+      if (count) threats.push(`${rule.label || rule.id} exposed (${count} instance${count > 1 ? 's' : ''})`);
+    }
   }
 
   // Check zero width
@@ -487,6 +530,42 @@ async function run() {
     return;
   }
 
+  // CHECK
+  if (command === 'check') {
+    const staged = args.includes('--staged');
+    const json = args.includes('-j') || args.includes('--json');
+    const verbose = args.includes('--verbose');
+    const noSuppress = args.includes('--no-suppress');
+    const configIndex = args.findIndex((a) => a === '--config');
+    const configPath = configIndex !== -1 && args[configIndex + 1] ? args[configIndex + 1] : null;
+
+    const targets = [];
+    for (let i = 1; i < args.length; i++) {
+      const a = args[i];
+      if (a === '--config') {
+        i++;
+        continue;
+      }
+      if (a.startsWith('-')) continue;
+      targets.push(a);
+    }
+
+    try {
+      const exitCode = await runCheck({
+        targets,
+        staged,
+        json,
+        verbose,
+        configPath,
+        suppressEntropy: !noSuppress,
+      });
+      process.exit(exitCode);
+    } catch (err) {
+      console.error(`\x1b[31mError:\x1b[0m ${err.message}`);
+      process.exit(err.exitCode || 2);
+    }
+  }
+
   // MCP SERVER SUBCOMMAND
   if (command === 'mcp' || command === 'serve') {
     await import('./aiscrubber-mcp.js');
@@ -521,7 +600,57 @@ async function run() {
 
   // SCRUB
   if (command === 'scrub') {
-    const target = args[1] && !args[1].startsWith('-') ? args[1] : null;
+    const noSuppress = args.includes('--no-suppress');
+    const forceStream = args.includes('--stream');
+    const toStdout = args.includes('--stdout');
+    const configIndex = args.findIndex((a) => a === '--config');
+    const configPath = configIndex !== -1 && args[configIndex + 1] ? args[configIndex + 1] : null;
+    const outIndex = args.findIndex((a) => a === '-o' || a === '--output');
+    const outputPath = outIndex !== -1 && args[outIndex + 1] ? args[outIndex + 1] : null;
+
+    let target = null;
+    for (let i = 1; i < args.length; i++) {
+      const a = args[i];
+      if (a === '--config' || a === '-o' || a === '--output') {
+        i++;
+        continue;
+      }
+      if (a.startsWith('-')) continue;
+      target = a;
+      break;
+    }
+
+    let loadedConfig;
+    try {
+      loadedConfig = loadConfig({ explicitPath: configPath });
+    } catch (err) {
+      console.error(`\x1b[31mError:\x1b[0m ${err.message}`);
+      process.exit(err.exitCode || 2);
+    }
+
+    const isFile = target && target !== '-' && fs.existsSync(target) && fs.statSync(target).isFile();
+    const isLarge = isFile && fs.statSync(target).size > 64 * 1024 * 1024;
+
+    if (isFile && (isLarge || forceStream)) {
+      try {
+        const stats = await streamScrubFile({
+          inputPath: target,
+          outputPath,
+          toStdout,
+          customRules: loadedConfig.customRules,
+          allowlist: loadedConfig.allowlist,
+          suppressEntropy: !noSuppress,
+        });
+        if (outputPath) {
+          console.log(`\x1b[32m✔ Scrubbed stream successfully!\x1b[0m Replaced ${stats.totalRedactions} sensitive tokens in ${(stats.bytesProcessed / (1024 * 1024)).toFixed(1)} MiB. Saved to \x1b[1m${outputPath}\x1b[0m`);
+        }
+        return;
+      } catch (err) {
+        console.error(`\x1b[31mError:\x1b[0m ${err.message}`);
+        process.exit(err.exitCode || 2);
+      }
+    }
+
     const inputContent = await resolveInput(target);
 
     if (!inputContent) {
@@ -530,13 +659,15 @@ async function run() {
       process.exit(1);
     }
 
-    const { scrubbed, counts, totalReplaced } = scrubText(inputContent);
+    const { scrubbed, counts, totalReplaced } = scrubText(inputContent, {
+      customRules: loadedConfig.customRules,
+      allowlist: loadedConfig.allowlist,
+      suppressEntropy: !noSuppress,
+    });
 
-    const outIndex = args.findIndex((a) => a === '-o' || a === '--output');
-    if (outIndex !== -1 && args[outIndex + 1]) {
-      const outPath = args[outIndex + 1];
-      fs.writeFileSync(outPath, scrubbed, 'utf-8');
-      console.log(`\x1b[32m✔ Scrubbed successfully!\x1b[0m Replaced ${totalReplaced} sensitive tokens. Saved to \x1b[1m${outPath}\x1b[0m`);
+    if (outputPath) {
+      fs.writeFileSync(outputPath, scrubbed, 'utf-8');
+      console.log(`\x1b[32m✔ Scrubbed successfully!\x1b[0m Replaced ${totalReplaced} sensitive tokens. Saved to \x1b[1m${outputPath}\x1b[0m`);
     } else if (args.includes('-j') || args.includes('--json')) {
       console.log(JSON.stringify({ scrubbed, counts, totalReplaced }, null, 2));
     } else {
@@ -651,7 +782,30 @@ async function run() {
 
   // INSPECT
   if (command === 'inspect') {
-    const target = args[1] && !args[1].startsWith('-') ? args[1] : null;
+    const noSuppress = args.includes('--no-suppress');
+    const configIndex = args.findIndex((a) => a === '--config');
+    const configPath = configIndex !== -1 && args[configIndex + 1] ? args[configIndex + 1] : null;
+
+    let target = null;
+    for (let i = 1; i < args.length; i++) {
+      const a = args[i];
+      if (a === '--config') {
+        i++;
+        continue;
+      }
+      if (a.startsWith('-')) continue;
+      target = a;
+      break;
+    }
+
+    let loadedConfig;
+    try {
+      loadedConfig = loadConfig({ explicitPath: configPath });
+    } catch (err) {
+      console.error(`\x1b[31mError:\x1b[0m ${err.message}`);
+      process.exit(err.exitCode || 2);
+    }
+
     const inspectionTarget = target || await resolveInput(target);
 
     if (!inspectionTarget) {
@@ -660,7 +814,11 @@ async function run() {
       process.exit(1);
     }
 
-    const inspection = inspectContent(inspectionTarget);
+    const inspection = inspectContent(inspectionTarget, {
+      customRules: loadedConfig.customRules,
+      allowlist: loadedConfig.allowlist,
+      suppressEntropy: !noSuppress,
+    });
     if (args.includes('-j') || args.includes('--json')) {
       console.log(JSON.stringify(inspection, null, 2));
     } else {

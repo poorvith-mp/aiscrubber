@@ -32,7 +32,30 @@ export function ScrubberWorkspace() {
   const [enabled, setEnabled] = useState<Set<DetectorId>>(
     () => new Set(defaultDetectors.map(({ id }) => id))
   );
-  const [customRules, setCustomRules] = useState<CustomRule[]>([]);
+  const RULES_STORAGE_KEY = 'aiscrubber.rules.v1';
+
+  const [customRules, setCustomRules] = useState<CustomRule[]>(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const stored = window.localStorage.getItem(RULES_STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      } catch {}
+    }
+    return [];
+  });
+
+  // Save to localStorage on change
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        window.localStorage.setItem(RULES_STORAGE_KEY, JSON.stringify(customRules));
+      } catch {}
+    }
+  }, [customRules]);
+
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [mappings, setMappings] = useState<TokenMapping[]>([]);
   const [diffSegments, setDiffSegments] = useState<DiffSegment[]>([]);
@@ -135,6 +158,66 @@ export function ScrubberWorkspace() {
     a.download = `aiscrubber_dictionary_${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function exportRules() {
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      customRules,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `aiscrubber-rules-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function importRules(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        const parsed = JSON.parse(content);
+        const rulesList = Array.isArray(parsed)
+          ? parsed
+          : Array.isArray(parsed.customRules)
+          ? parsed.customRules
+          : null;
+        if (rulesList) {
+          const validRules = rulesList
+            .filter((r: any) => r && typeof r.id === 'string' && typeof r.patternString === 'string')
+            .map((r: any) => ({
+              id: r.id,
+              label: r.label || 'Imported Rule',
+              token: (r.token || 'CUSTOM').toUpperCase().replace(/[^A-Z0-9_]/g, '_'),
+              patternString: r.patternString,
+              isRegex: Boolean(r.isRegex),
+              enabled: r.enabled !== false,
+            }));
+          setCustomRules(validRules);
+        }
+      } catch {
+        alert('Invalid rules JSON format');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }
+
+  function clearAllRules() {
+    if (window.confirm('Clear all custom rules?')) {
+      setCustomRules([]);
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.removeItem(RULES_STORAGE_KEY);
+      }
+    }
   }
 
   const totalReplacements = useMemo(
@@ -258,14 +341,48 @@ export function ScrubberWorkspace() {
       {/* Custom Rules Drawer */}
       {showCustomDrawer && (
         <div className="mb-6 p-4 rounded-xl bg-[var(--surface-sunken)] border border-[var(--line)]">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="text-sm font-bold flex items-center gap-2">
-              <Settings2 size={16} className="text-[var(--accent)]" />
-              Custom Keywords & Regex Rules
-            </h4>
-            <span className="text-xs text-[var(--muted)]">
-              Add proprietary terms or patterns
-            </span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div>
+              <h4 className="text-sm font-bold flex items-center gap-2">
+                <Settings2 size={16} className="text-[var(--accent)]" />
+                Custom Keywords & Regex Rules
+              </h4>
+              <span className="text-xs text-[var(--muted)]">
+                Local-first rules persisted in browser storage ({customRules.length})
+              </span>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <label className="btn-secondary text-xs cursor-pointer inline-flex items-center gap-1.5">
+                <Upload size={13} />
+                <span>Import</span>
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={importRules}
+                  className="hidden"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={exportRules}
+                disabled={customRules.length === 0}
+                className="btn-secondary text-xs inline-flex items-center gap-1.5"
+                title="Export custom rules to JSON"
+              >
+                <Download size={13} />
+                <span>Export</span>
+              </button>
+              <button
+                type="button"
+                onClick={clearAllRules}
+                disabled={customRules.length === 0}
+                className="btn-secondary text-xs text-red-400 hover:text-red-300 inline-flex items-center gap-1.5"
+                title="Clear all custom rules"
+              >
+                <Trash2 size={13} />
+                <span>Clear</span>
+              </button>
+            </div>
           </div>
 
           <form
@@ -423,6 +540,11 @@ export function ScrubberWorkspace() {
               )}
             </div>
           )}
+          {counts['entropy-suppressed'] && counts['entropy-suppressed'] > 0 ? (
+            <div className="mt-2 text-xs text-[var(--muted)] flex items-center gap-1.5" data-testid="suppression-notice">
+              <span>{counts['entropy-suppressed']} low-confidence {counts['entropy-suppressed'] === 1 ? 'match' : 'matches'} left unchanged</span>
+            </div>
+          ) : null}
         </div>
       </div>
 

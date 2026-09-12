@@ -1,0 +1,23 @@
+{
+  "name": "healthcare",
+  "version": 1,
+  "description": "Healthcare patient and provider identifiers (NPI, MRN)",
+  "customRules": [
+    {
+      "id": "npi",
+      "label": "National Provider Identifier",
+      "token": "NPI",
+      "patternString": "\\b\\d{10}\\b",
+      "isRegex": true,
+      "enabled": true
+    },
+    {
+      "id": "mrn",
+      "label": "Medical Record Number",
+      "token": "MRN",
+      "patternString": "\\bMRN[-:\\s]?[A-Z0-9]{6,12}\\b",
+      "isRegex": true,
+      "enabled": true
+    }
+  ]
+}

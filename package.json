@@ -1,6 +1,6 @@
 {
   "name": "aiscrubber",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "Browser-local privacy desk, CLI, and MCP server to scrub secrets before sharing with LLMs.",
   "author": "Poorvith M P <https://poorvithmp.com>",
   "license": "MIT",
@@ -32,6 +32,7 @@
   ],
   "files": [
     "bin",
+    "packs",
     "src/lib/scrubCore.js",
     "src/lib/scrubCore.d.ts",
     "README.md",

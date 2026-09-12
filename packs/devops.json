@@ -1,0 +1,31 @@
+{
+  "name": "devops",
+  "version": 1,
+  "description": "DevOps secrets, private keys, connection strings and tokens",
+  "customRules": [
+    {
+      "id": "pem-key",
+      "label": "PEM Private Key Block",
+      "token": "PEM",
+      "patternString": "-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\\s\\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----",
+      "isRegex": true,
+      "enabled": true
+    },
+    {
+      "id": "jwt",
+      "label": "JSON Web Token",
+      "token": "JWT",
+      "patternString": "\\beyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\b",
+      "isRegex": true,
+      "enabled": true
+    },
+    {
+      "id": "database-url",
+      "label": "Database Connection String",
+      "token": "DATABASE_URL",
+      "patternString": "\\b(?:postgres|postgresql|mysql|mongodb(?:\\+srv)?|redis|amqp):\\/\\/[^\\s\"']+",
+      "isRegex": true,
+      "enabled": true
+    }
+  ]
+}

@@ -8,9 +8,39 @@
 
 import readline from 'node:readline';
 import { detectorDefinitions, scrubBuiltIns } from '../src/lib/scrubCore.js';
+import { loadConfig } from './lib/rulesLoader.js';
 
 const SERVER_NAME = 'aiscrubber-mcp';
-const SERVER_VERSION = '2.3.0';
+const SERVER_VERSION = '2.4.0';
+
+let currentConfig = loadConfig();
+
+function resolveCallRules(perCallCustomRules, perCallAllowlist) {
+  let customRules = currentConfig.customRules ? [...currentConfig.customRules] : [];
+  let allowlist = currentConfig.allowlist ? [...currentConfig.allowlist] : [];
+
+  if (Array.isArray(perCallCustomRules) && perCallCustomRules.length > 0) {
+    const map = new Map(customRules.map((r) => [r.id, r]));
+    for (const r of perCallCustomRules) {
+      if (r && r.id) {
+        map.set(r.id, { ...r });
+      }
+    }
+    customRules = Array.from(map.values());
+  }
+
+  if (Array.isArray(perCallAllowlist) && perCallAllowlist.length > 0) {
+    const existingVals = new Set(allowlist.map((a) => a.value));
+    for (const a of perCallAllowlist) {
+      if (a && typeof a.value === 'string' && !existingVals.has(a.value)) {
+        allowlist.push(a);
+        existingVals.add(a.value);
+      }
+    }
+  }
+
+  return { customRules, allowlist };
+}
 
 const HOMOGLYPH_MAP = {
   'а': 'a', 'А': 'A', 'с': 'c', 'С': 'C', 'е': 'e', 'Е': 'E', 'о': 'o', 'О': 'O',
@@ -94,8 +124,8 @@ function cleanWatermarkContent(text) {
   };
 }
 
-function scrubContent(text) {
-  const result = scrubBuiltIns(text);
+function scrubContent(text, options = {}) {
+  const result = scrubBuiltIns(text, undefined, { ...options, suppressEntropy: true });
   return {
     scrubbed: result.text,
     mappings: Object.fromEntries(result.mappings.map(({ original, token }) => [original, token])),
@@ -103,8 +133,8 @@ function scrubContent(text) {
   };
 }
 
-function maskPromptContent(prompt) {
-  const scrubbed = scrubBuiltIns(prompt);
+function maskPromptContent(prompt, options = {}) {
+  const scrubbed = scrubBuiltIns(prompt, undefined, { ...options, suppressEntropy: true });
   let masked = scrubbed.text;
   const sessionKey = {
     id: `aiscrub_${Date.now()}`,
@@ -136,14 +166,21 @@ function unmaskContent(aiResponse, sessionKey) {
   return { unmasked, restoredVariables: count };
 }
 
-function inspectContent(content) {
+function inspectContent(content, options = {}) {
   const threats = [];
   const details = {};
 
-  const scrubbed = scrubBuiltIns(content);
+  const scrubbed = scrubBuiltIns(content, undefined, { ...options, suppressEntropy: true });
   for (const detector of detectorDefinitions) {
     const count = scrubbed.counts[detector.id] || 0;
     if (count) threats.push(`${detector.label} exposed (${count} instance${count > 1 ? 's' : ''})`);
+  }
+
+  if (options.customRules) {
+    for (const rule of options.customRules) {
+      const count = scrubbed.counts[`custom_${rule.id}`] || 0;
+      if (count) threats.push(`${rule.label || rule.id} exposed (${count} instance${count > 1 ? 's' : ''})`);
+    }
   }
 
   const zw = content.match(/[\u200B\u200C\u200D\uFEFF\u2060\uDB40\uFE00-\uFE0F]|\\u(?:200[bcd]|feff|2060)/g);
@@ -161,6 +198,14 @@ function inspectContent(content) {
 
 const TOOLS = [
   {
+    name: 'reload_rules',
+    description: 'Reload rules and active rule packs from .aiscrubrc.json without server restart.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
     name: 'clean_ai_watermarks',
     description: 'Strip invisible Unicode zero-width watermarks, Tag-Plane surrogate characters, normalize non-standard spaces, revert homoglyphs, and disrupt AI cadence clichés.',
     inputSchema: {
@@ -173,22 +218,60 @@ const TOOLS = [
   },
   {
     name: 'scrub_text',
-    description: 'Scrub PII, emails, API keys, passwords, IPs, and sensitive credentials into numbered safe tokens.',
+    description: 'Scrub PII, emails, API keys, passwords, IPs, and sensitive credentials into numbered safe tokens, applying entropy suppression and active rules source.',
     inputSchema: {
       type: 'object',
       properties: {
         text: { type: 'string', description: 'Raw text or log file content to sanitize' },
+        allowlist: {
+          type: 'array',
+          description: 'Optional per-call allowlist rules ({ value, isRegex })',
+          items: {
+            type: 'object',
+            properties: {
+              value: { type: 'string' },
+              isRegex: { type: 'boolean' },
+            },
+            required: ['value'],
+          },
+        },
+        customRules: {
+          type: 'array',
+          description: 'Optional per-call custom rules ({ id, label, token, patternString, isRegex, enabled })',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              label: { type: 'string' },
+              token: { type: 'string' },
+              patternString: { type: 'string' },
+              isRegex: { type: 'boolean' },
+              enabled: { type: 'boolean' },
+            },
+            required: ['id', 'patternString'],
+          },
+        },
       },
       required: ['text'],
     },
   },
   {
     name: 'mask_prompt',
-    description: 'Mask confidential secrets with placeholder variables (e.g. {{API_KEY_1}}) and return a session key before querying an external LLM.',
+    description: 'Mask confidential secrets with placeholder variables (e.g. {{API_KEY_1}}) and return a session key before querying an external LLM, applying active rules source.',
     inputSchema: {
       type: 'object',
       properties: {
         prompt: { type: 'string', description: 'Raw user prompt to sanitize for LLMs' },
+        allowlist: {
+          type: 'array',
+          description: 'Optional per-call allowlist rules ({ value, isRegex })',
+          items: { type: 'object' },
+        },
+        customRules: {
+          type: 'array',
+          description: 'Optional per-call custom rules',
+          items: { type: 'object' },
+        },
       },
       required: ['prompt'],
     },
@@ -207,11 +290,21 @@ const TOOLS = [
   },
   {
     name: 'inspect_content',
-    description: 'Inspect text or code for leaked API keys, tokens, PII, invisible Unicode characters.',
+    description: 'Inspect text or code for leaked API keys, tokens, PII, invisible Unicode characters, and entropy candidates using active rules source.',
     inputSchema: {
       type: 'object',
       properties: {
         text: { type: 'string', description: 'Raw text or code snippet to inspect' },
+        allowlist: {
+          type: 'array',
+          description: 'Optional per-call allowlist rules ({ value, isRegex })',
+          items: { type: 'object' },
+        },
+        customRules: {
+          type: 'array',
+          description: 'Optional per-call custom rules',
+          items: { type: 'object' },
+        },
       },
       required: ['text'],
     },
@@ -286,12 +379,44 @@ function handleMessage(msg) {
   if (method === 'tools/call') {
     const { name, arguments: args } = params || {};
 
-    if (name === 'clean_ai_watermarks') {
-      const result = cleanWatermarkContent(args?.text || '');
+    if (name === 'reload_rules') {
+      try {
+        currentConfig = loadConfig();
+      } catch (err) {
+        return {
+          jsonrpc: '2.0',
+          id,
+          error: { code: -32603, message: `Failed to reload rules: ${err.message}` },
+        };
+      }
+      const result = {
+        rulesSource: currentConfig.source,
+        customRuleCount: currentConfig.customRules.length,
+        allowlistCount: currentConfig.allowlist.length,
+      };
       return {
         jsonrpc: '2.0',
         id,
         result: {
+          rulesSource: currentConfig.source,
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        },
+      };
+    }
+
+    if (name === 'clean_ai_watermarks') {
+      const result = cleanWatermarkContent(args?.text || '');
+      result.rulesSource = currentConfig.source;
+      return {
+        jsonrpc: '2.0',
+        id,
+        result: {
+          rulesSource: currentConfig.source,
           content: [
             {
               type: 'text',
@@ -303,11 +428,14 @@ function handleMessage(msg) {
     }
 
     if (name === 'scrub_text') {
-      const result = scrubContent(args?.text || '');
+      const { customRules, allowlist } = resolveCallRules(args?.customRules, args?.allowlist);
+      const result = scrubContent(args?.text || '', { customRules, allowlist });
+      result.rulesSource = currentConfig.source;
       return {
         jsonrpc: '2.0',
         id,
         result: {
+          rulesSource: currentConfig.source,
           content: [
             {
               type: 'text',
@@ -319,11 +447,14 @@ function handleMessage(msg) {
     }
 
     if (name === 'mask_prompt') {
-      const result = maskPromptContent(args?.prompt || '');
+      const { customRules, allowlist } = resolveCallRules(args?.customRules, args?.allowlist);
+      const result = maskPromptContent(args?.prompt || '', { customRules, allowlist });
+      result.rulesSource = currentConfig.source;
       return {
         jsonrpc: '2.0',
         id,
         result: {
+          rulesSource: currentConfig.source,
           content: [
             {
               type: 'text',
@@ -336,10 +467,12 @@ function handleMessage(msg) {
 
     if (name === 'unmask_response') {
       const result = unmaskContent(args?.ai_response || '', args?.session_key || {});
+      result.rulesSource = currentConfig.source;
       return {
         jsonrpc: '2.0',
         id,
         result: {
+          rulesSource: currentConfig.source,
           content: [
             {
               type: 'text',
@@ -351,11 +484,14 @@ function handleMessage(msg) {
     }
 
     if (name === 'inspect_content') {
-      const result = inspectContent(args?.text || '');
+      const { customRules, allowlist } = resolveCallRules(args?.customRules, args?.allowlist);
+      const result = inspectContent(args?.text || '', { customRules, allowlist });
+      result.rulesSource = currentConfig.source;
       return {
         jsonrpc: '2.0',
         id,
         result: {
+          rulesSource: currentConfig.source,
           content: [
             {
               type: 'text',
@@ -383,6 +519,8 @@ function handleMessage(msg) {
     error: { code: -32601, message: `Method '${method}' not supported` },
   };
 }
+
+export { handleMessage, SERVER_NAME, SERVER_VERSION };
 
 if (process.stderr.isTTY) {
   process.stderr.write(`\x1b[32m[aiscrubber-mcp]\x1b[0m Server v${SERVER_VERSION} running on stdio.\n`);
