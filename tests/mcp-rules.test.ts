@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { handleMessage } from '../bin/aiscrubber-mcp.js';
+import { handleMessage } from '../bin/lib/mcpServer.js';
 
 describe('MCP Server with Rules & Reload', () => {
   test('initialize and tools/list include reload_rules', () => {
