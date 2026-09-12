@@ -4,19 +4,19 @@
 
 ## Core Capabilities
 - **Image Metadata Cleaner**: Detects and removes supported EXIF/GPS, PNG text, and C2PA-compatible image metadata markers in local memory. It does not verify cryptographic signatures or identify issuers.
-- **AI Text & Claude Invisible Watermark Remover**: Strips zero-width characters (ZWSP, ZWNJ, ZWJ, BOM, Word Joiners), Unicode Tag-Plane steganography (U+E0001-U+E007F), variation selectors, non-standard spaces, confusable homoglyphs, and AI stylometric cadence clichés.
+- **Unicode Cleaner**: Removes selected invisible characters, Tag Plane tokens, variation selectors, unusual spaces, and confusables. Optional literal phrase rules clean copy. Findings do not identify a source model or prove a vendor watermark.
 - **Text & Incident Log Scrubber**: Replaces sensitive emails, API keys, Bearer tokens, IP addresses, payment cards, and customer IDs with numbered tokens ([EMAIL_1], [SECRET_1]).
 - **Prompt Enhancer & Roundtrip Anonymizer**: Masks secrets into {{API_KEY_1}} constants and restores original values from AI-generated responses using local session keys.
 - **Visual Media Redactor**: Interactive HTML5 Canvas tool for Gaussian Blur, Pixelation, and Blackout redactions on images and screenshots.
 
 ## Technical Guarantee
-100% of processing occurs client-side in browser RAM or local Node.js CLI processes. Zero telemetry, zero analytics tracking on user data, zero external API calls.
+Content processing occurs in browser memory or local Node.js CLI processes. The website loads Google Fonts and a public GitHub star count without including user content. Session mapping files contain original values and must stay private.
 
 ## Developer CLI & MCP
 - Run standalone via NPX: `npx aiscrubber clean-watermarks <file>`, `npx aiscrubber scrub <file>`, `npx aiscrubber mask <prompt>`, `npx aiscrubber unmask <response> --key <key.json>`.
 - MCP server command: `npx -y aiscrubber mcp`.
 
 ## Creator
-Built by Poorvith M P, student developer & founder based in Bengaluru, India.
+Built by Poorvith M P, student developer.
 Website: https://poorvithmp.com
 GitHub: https://github.com/poorvith-mp/aiscrubber

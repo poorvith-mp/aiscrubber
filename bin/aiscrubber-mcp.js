@@ -128,7 +128,7 @@ function unmaskContent(aiResponse, sessionKey) {
     const regex = new RegExp(escaped, 'g');
     const matchCount = (unmasked.match(regex) || []).length;
     if (matchCount > 0) {
-      unmasked = unmasked.replace(regex, original);
+      unmasked = unmasked.replace(regex, () => original);
       count += matchCount;
     }
   }
@@ -140,11 +140,6 @@ function inspectContent(content) {
   const threats = [];
   const details = {};
 
-  if (content.includes('caPI') || content.includes('jumb') || content.includes('\xFF\xEB')) {
-    threats.push('C2PA-compatible metadata marker detected; signature not verified');
-    details.c2pa = { hasManifest: true };
-  }
-
   const scrubbed = scrubBuiltIns(content);
   for (const detector of detectorDefinitions) {
     const count = scrubbed.counts[detector.id] || 0;
@@ -153,7 +148,7 @@ function inspectContent(content) {
 
   const zw = content.match(/[\u200B\u200C\u200D\uFEFF\u2060\uDB40\uFE00-\uFE0F]|\\u(?:200[bcd]|feff|2060)/g);
   if (zw) {
-    threats.push(`Invisible zero-width / Tag-Plane watermarks detected (${zw.length} instance${zw.length > 1 ? 's' : ''})`);
+    threats.push(`Invisible zero-width / Tag Plane characters detected (${zw.length} instance${zw.length > 1 ? 's' : ''})`);
   }
 
   return {
@@ -212,7 +207,7 @@ const TOOLS = [
   },
   {
     name: 'inspect_content',
-    description: 'Inspect text or code for leaked API keys, tokens, PII, invisible watermarks, and C2PA provenance indicators.',
+    description: 'Inspect text or code for leaked API keys, tokens, PII, invisible Unicode characters.',
     inputSchema: {
       type: 'object',
       properties: {

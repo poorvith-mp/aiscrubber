@@ -83,7 +83,7 @@ export function MetadataWorkspace() {
 
   // Handle Bulk Files Selection / Drop
   async function handleFilesSelected(fileList: FileList | File[]) {
-    const newFiles = Array.from(fileList).filter((file) => file.type.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(file.name));
+    const newFiles = Array.from(fileList).filter((file) => /^(image\/(png|jpeg|webp))$/.test(file.type) || /\.(png|jpe?g|webp)$/i.test(file.name));
     if (newFiles.length === 0) return;
 
     setStatusMessage(null);
@@ -199,6 +199,7 @@ export function MetadataWorkspace() {
         );
 
         const cleanBlob = await stripMetadataUniversal(item.file);
+        if (cleanBlob === item.file) throw new Error('Image could not be sanitized');
         updatedItems[i].cleanBlob = cleanBlob;
         updatedItems[i].status = 'done';
 
@@ -221,7 +222,7 @@ export function MetadataWorkspace() {
     }
 
     setIsBatchProcessing(false);
-    setStatusMessage(`Removed supported metadata markers from ${items.length} image(s).`);
+    setStatusMessage(`Sanitized ${updatedItems.filter((item) => item.status === 'done').length} of ${items.length} image(s). Check failed items before exporting.`);
   }
 
   // Apply standard metadata edits to all supported images.
@@ -245,21 +246,23 @@ export function MetadataWorkspace() {
           Software: bulkFields.Software,
           Copyright: bulkFields.Copyright,
         });
+        if (editedBlob === item.file) throw new Error('Metadata editing is supported for JPEG and PNG only');
 
         setItems((prev) =>
           prev.map((it, idx) =>
-            idx === i ? { ...it, editedBlob, status: 'done' } : it
+            idx === i ? { ...it, editedBlob, cleanBlob: null, status: 'done' } : it
           )
         );
       } catch (err) {
         console.error('Error applying bulk edits to:', item.file.name, err);
+        setItems((prev) => prev.map((it) => it.id === item.id ? { ...it, status: 'error', error: 'Editing failed or unsupported format' } : it));
       }
       completed++;
       setProgress({ current: completed, total: items.length });
     }
 
     setIsBatchProcessing(false);
-    setStatusMessage(`Updated standard metadata for ${items.length} image(s).`);
+    setStatusMessage('Batch edit finished. JPEG and PNG support editing; check each file status before exporting.');
   }
 
   // Download All as ZIP archive
@@ -280,6 +283,7 @@ export function MetadataWorkspace() {
         } else {
           // If not processed yet, strip on the fly for the zip
           const cleanBlob = await stripMetadataUniversal(item.file);
+          if (cleanBlob === item.file) throw new Error('Image could not be sanitized');
           const ext = item.file.name.split('.').pop();
           const base = item.file.name.replace(/\.[^/.]+$/, '');
           zip.file(`${base}_sanitized.${ext}`, cleanBlob);
@@ -303,10 +307,12 @@ export function MetadataWorkspace() {
 
   // Download single item clean
   async function handleDownloadSingleClean(item: BatchFileItem) {
+    try {
     let targetBlob = item.cleanBlob;
     if (!targetBlob) {
       targetBlob = await stripMetadataUniversal(item.file);
     }
+    if (targetBlob === item.file) throw new Error('Image could not be sanitized');
     const url = URL.createObjectURL(targetBlob);
     const a = document.createElement('a');
     a.href = url;
@@ -315,6 +321,9 @@ export function MetadataWorkspace() {
     a.download = `${base}_sanitized.${ext}`;
     a.click();
     URL.revokeObjectURL(url);
+    } catch {
+      setStatusMessage('Unable to sanitize this image. No file was downloaded.');
+    }
   }
 
   // Save single item edits
@@ -327,10 +336,11 @@ export function MetadataWorkspace() {
         Software: editFields.Software,
         Copyright: editFields.Copyright,
       });
+      if (modifiedBlob === activeItem.file) throw new Error('Metadata editing is supported for JPEG and PNG only');
 
       setItems((prev) =>
         prev.map((it) =>
-          it.id === activeItem.id ? { ...it, editedBlob: modifiedBlob, status: 'done' } : it
+          it.id === activeItem.id ? { ...it, editedBlob: modifiedBlob, cleanBlob: null, status: 'done' } : it
         )
       );
 
@@ -367,7 +377,7 @@ export function MetadataWorkspace() {
             </span>
           </div>
           <h2 className="text-2xl md:text-3xl font-headline font-bold">
-            Metadata & C2PA Provenance Desk
+            Image Metadata Desk
           </h2>
           <p className="text-sm text-[var(--muted)] mt-1">
             Inspect and remove supported EXIF, GPS, PNG text, and C2PA-compatible metadata markers from images in browser memory. Marker presence is detected; cryptographic signature verification is not performed.
@@ -464,7 +474,7 @@ export function MetadataWorkspace() {
 
             <div className="p-3.5 rounded-2xl bg-[var(--surface-sunken)] border border-[var(--line)] space-y-1">
               <span className="text-[10px] font-mono text-[var(--muted)] uppercase block">
-                Active C2PA Manifests
+                C2PA-compatible markers
               </span>
               <span className="text-xl font-bold font-mono text-emerald-400">
                 {totalC2paDetected} detected
@@ -684,7 +694,7 @@ export function MetadataWorkspace() {
                         }`}
                       >
                         <Edit3 size={13} />
-                        Edit C2PA
+                        Edit Metadata
                       </button>
                       <button
                         type="button"
@@ -849,7 +859,7 @@ export function MetadataWorkspace() {
 
                       <div className="pt-2 flex items-center justify-between">
                         <span className="text-xs text-[var(--muted)] font-mono">
-                          Existing C2PA-compatible markers are removed; no replacement signature is created.
+                          Editing supports JPEG and PNG. WebP supports stripping only.
                         </span>
                         <button
                           type="button"

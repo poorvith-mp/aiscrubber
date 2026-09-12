@@ -45,12 +45,12 @@ Local-processing privacy suite for developer prompts, crash logs, and files.
   $ cat incident.log | npx aiscrubber scrub
 
 \x1b[1mCOMMANDS\x1b[0m
-  \x1b[36mclean-watermarks\x1b[0m <file | text>  Strip Claude & AI invisible Unicode zero-width watermarks
+  \x1b[36mclean-watermarks\x1b[0m <file | text>  Remove selected invisible Unicode and copy artifacts
   \x1b[36mscrub\x1b[0m <file | text>             Scrub PII, tokens, and secrets into numbered labels
   \x1b[36mmask\x1b[0m <file | prompt>            Mask secrets with constants and generate a session key
   \x1b[36munmask\x1b[0m <ai-file> --key <key>     Reconstruct original secrets back into returned AI output
-  \x1b[36mstrip-metadata\x1b[0m <files...>         Strip EXIF, GPS, C2PA, and PDF/Audio metadata client-side
-  \x1b[36minspect\x1b[0m <file | text>           Inspect hidden metadata, C2PA manifests, or text secrets
+  \x1b[36mstrip-metadata\x1b[0m <files...>         Strip supported metadata from JPEG, PNG, and WebP images
+  \x1b[36minspect\x1b[0m <file | text>           Scan text files for credentials and invisible Unicode
   \x1b[36mmcp\x1b[0m, \x1b[36mserve\x1b[0m                        Start native stdio MCP server for Claude Desktop & Cursor
 
 \x1b[1mGLOBAL OPTIONS\x1b[0m
@@ -176,7 +176,7 @@ using the session key produced by 'mask'.
     case 'strip-metadata':
       console.log(`
 \x1b[1mCOMMAND: strip-metadata\x1b[0m
-Strips EXIF, GPS coordinates, C2PA Content Credentials manifests, and PDF /Info dictionaries
+Strips supported metadata from JPEG, PNG, and WebP images
 from images and documents completely in local memory.
 
 \x1b[1mUSAGE\x1b[0m
@@ -190,7 +190,7 @@ from images and documents completely in local memory.
     case 'inspect':
       console.log(`
 \x1b[1mCOMMAND: inspect\x1b[0m
-Scans a file or text string for hidden EXIF metadata, C2PA Content Credentials manifests,
+Scans UTF-8 files or text strings for supported credential patterns
 embedded AI generation prompts, and exposed credentials.
 
 \x1b[1mUSAGE\x1b[0m
@@ -308,7 +308,7 @@ function unmaskResponse(aiContent, sessionKeyObj) {
     const regex = new RegExp(escaped, 'g');
     const count = (unmasked.match(regex) || []).length;
     if (count > 0) {
-      unmasked = unmasked.replace(regex, original);
+      unmasked = unmasked.replace(regex, () => original);
       restoredCount += count;
     }
   }
@@ -325,20 +325,11 @@ function inspectContent(target) {
   if (isFile) {
     fileStats = fs.statSync(target);
     const buffer = fs.readFileSync(target);
-    content = buffer.toString('latin1');
+    content = buffer.toString('utf8');
   }
 
   const threats = [];
   const details = {};
-
-  // Check C2PA markers
-  if (content.includes('caPI') || content.includes('c2pa') || content.includes('jumb') || content.includes('\xFF\xEB')) {
-    threats.push('C2PA Content Credentials cryptographic manifest active');
-    details.c2pa = { hasManifest: true };
-    if (content.includes('OpenAI')) details.c2pa.signer = 'OpenAI Inc.';
-    if (content.includes('Nano Banana')) details.c2pa.signer = 'Nano Banana CA';
-    if (content.includes('Adobe')) details.c2pa.signer = 'Adobe Inc.';
-  }
 
   // Check text detectors
   const scrubbed = scrubBuiltIns(content);
@@ -350,11 +341,11 @@ function inspectContent(target) {
   // Check zero width
   const zw = content.match(/[\u200B\u200C\u200D\uFEFF\u2060\uDB40\uFE00-\uFE0F]|\\u(?:200[bcd]|feff|2060)/g);
   if (zw) {
-    threats.push(`Invisible zero-width / Tag-Plane watermarks detected (${zw.length} instance${zw.length > 1 ? 's' : ''})`);
+    threats.push(`Invisible zero-width / Tag Plane characters detected (${zw.length} instance${zw.length > 1 ? 's' : ''})`);
   }
 
   return {
-    target: isFile ? path.resolve(target) : 'Inline Text String',
+    target: isFile ? path.basename(target) : 'Inline Text String',
     sizeBytes: fileStats ? fileStats.size : Buffer.byteLength(content, 'utf8'),
     threatsFound: threats.length,
     threats,
@@ -450,20 +441,14 @@ async function resolveInput(target) {
   if ((target === '-' || !target) && !process.stdin.isTTY) {
     return new Promise((resolve) => {
       let data = '';
-      let timer = setTimeout(() => {
-        resolve(data.length > 0 ? data : null);
-      }, 200);
-
       process.stdin.setEncoding('utf-8');
       process.stdin.on('data', (chunk) => {
         data += chunk;
       });
       process.stdin.on('end', () => {
-        clearTimeout(timer);
         resolve(data.length > 0 ? data : null);
       });
       process.stdin.on('error', () => {
-        clearTimeout(timer);
         resolve(null);
       });
     });
@@ -635,6 +620,7 @@ async function run() {
     for (const filePath of files) {
       if (!fs.existsSync(filePath)) {
         console.warn(`\x1b[33mWarning:\x1b[0m File '${filePath}' not found, skipping.`);
+        process.exitCode = 1;
         continue;
       }
 
@@ -648,24 +634,16 @@ async function run() {
         cleaned = stripJpegMetadata(buffer);
       } else if (ext === '.webp') {
         cleaned = stripWebpMetadata(buffer);
-      } else if (ext === '.pdf') {
-        let text = buffer.toString('latin1');
-        text = text.replace(/\/Info\s+\d+\s+\d+\s+R/g, '/Info null');
-        text = text.replace(/\/Author\s*\([^)]*\)/gi, '/Author ()');
-        text = text.replace(/\/Creator\s*\([^)]*\)/gi, '/Creator ()');
-        text = text.replace(/\/Producer\s*\([^)]*\)/gi, '/Producer ()');
-        text = text.replace(/\/Title\s*\([^)]*\)/gi, '/Title ()');
-        text = text.replace(/\/CreationDate\s*\([^)]*\)/gi, '/CreationDate ()');
-        cleaned = Buffer.from(text, 'latin1');
       }
 
       if (!cleaned) {
         console.warn(`\x1b[33mWarning:\x1b[0m '${filePath}' is not a supported format or could not be stripped.`);
+        process.exitCode = 1;
         continue;
       }
 
       const outPath = filePath.replace(/(\.[^.]+)$/i, '_sanitized$1');
-      fs.writeFileSync(outPath, cleaned);
+      fs.writeFileSync(outPath, cleaned, { flag: 'wx' });
       console.log(`\x1b[32m✔ Stripped metadata:\x1b[0m ${outPath}`);
     }
     return;
@@ -674,7 +652,7 @@ async function run() {
   // INSPECT
   if (command === 'inspect') {
     const target = args[1] && !args[1].startsWith('-') ? args[1] : null;
-    const inspectionTarget = await resolveInput(target);
+    const inspectionTarget = target || await resolveInput(target);
 
     if (!inspectionTarget) {
       console.error('\x1b[31mError:\x1b[0m Provide a file path, text string, or pipe content to inspect.');
@@ -693,7 +671,7 @@ async function run() {
           console.log(`  \x1b[31m✖\x1b[0m ${t}`);
         }
       } else {
-        console.log('  \x1b[32m✔\x1b[0m No exposed credentials or C2PA tracking manifests found.');
+        console.log('  \x1b[32m✔\x1b[0m No matching text patterns found. Review content before sharing.');
       }
       console.log('');
     }
@@ -701,6 +679,7 @@ async function run() {
   }
 
   console.error(`\x1b[31mUnknown command:\x1b[0m ${command}. Run 'npx aiscrubber --help' for usage.`);
+  process.exitCode = 1;
 }
 
 run().catch((err) => {

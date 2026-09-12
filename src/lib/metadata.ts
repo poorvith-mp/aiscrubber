@@ -509,6 +509,14 @@ export async function applyMetadataEdits(
 export async function stripMetadataUniversal(file: File): Promise<Blob | File> {
   const mimeType = file.type || '';
 
+  if (mimeType === 'image/webp' || /\.webp$/i.test(file.name)) {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if (String.fromCharCode(...bytes.subarray(0, 4)) !== 'RIFF' || String.fromCharCode(...bytes.subarray(8, 12)) !== 'WEBP') {
+      throw new Error('Invalid WebP image');
+    }
+    return new Blob([stripWebpMetadataChunks(bytes) as BlobPart], { type: 'image/webp' });
+  }
+
   if (mimeType === 'image/jpeg' || mimeType === 'image/jpg' || file.name.match(/\.jpe?g$/i)) {
     try {
       const dataUrl = await fileToDataUrl(file);

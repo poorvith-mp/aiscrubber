@@ -132,7 +132,7 @@ When user CUST-44912 (email: billing@partner.org) charges over $500, trigger web
                   4. Metadata & C2PA Desk
                 </span>
                 <p className="text-xs">
-                  Inspects C2PA Content Credentials (ChatGPT, DALL·E 3, Nano Banana), edits author tags, and strips EXIF/GPS.
+                  Detects supported image metadata markers, edits JPEG/PNG author tags, and strips supported EXIF/GPS fields.
                 </p>
               </div>
             </div>
@@ -231,7 +231,7 @@ When user CUST-44912 (email: billing@partner.org) charges over $500, trigger web
             </h4>
             <ul className="list-disc pl-5 space-y-1.5 text-xs">
               <li><strong>Aggressive (All Tiers):</strong> Complete sanitization of zero-width, tag-plane tokens, non-standard spaces, homoglyphs, and AI footers.</li>
-              <li><strong>Claude & LLM Output:</strong> Tuned specifically for Anthropic Claude and ChatGPT response structures and stylometric markers.</li>
+              <li><strong>Prose Cleanup:</strong> Applies selected Unicode and literal phrase cleanup rules to prose.</li>
               <li><strong>Code Safe:</strong> Preserves necessary syntax indentation for Python, YAML, JS, and Rust while stripping invisible characters.</li>
               <li><strong>Invisible Unicode Only:</strong> Minimalist mode removing strictly zero-width and bidi characters.</li>
             </ul>
@@ -335,7 +335,7 @@ When user CUST-44912 (email: billing@partner.org) charges over $500, trigger web
                   <span className="font-mono text-[10px] text-[var(--muted)]">Options: -k, -o</span>
                 </div>
                 <p className="text-[var(--muted)]">
-                  Masks confidential database URLs, passwords, and API keys into constants and exports an encrypted session key.
+                  Masks detected secrets into constants and exports a plaintext JSON mapping. Keep this file private: it contains the original values.
                 </p>
               </div>
 
@@ -355,7 +355,7 @@ When user CUST-44912 (email: billing@partner.org) charges over $500, trigger web
                   <span className="font-mono text-[10px] text-[var(--muted)]">Options: --json</span>
                 </div>
                 <p className="text-[var(--muted)]">
-                  Terminal security inspector that audits files for exposed API keys, C2PA Content Credentials manifests, and hidden EXIF GPS tags.
+                  Scans text and UTF-8 files for supported credential patterns and invisible Unicode. Use the browser Metadata Desk for image metadata inspection.
                 </p>
               </div>
             </div>
@@ -368,7 +368,7 @@ When user CUST-44912 (email: billing@partner.org) charges over $500, trigger web
         categoryLabel: 'Developer Tools',
         title: 'Model Context Protocol (MCP) Server',
         description:
-          'Connect AIScrubber directly to Claude Desktop, Claude Code CLI, and Cursor as an official native MCP server.',
+          'Connect AIScrubber to MCP clients through its local stdio server.',
         headings: [
           { id: 'claude-desktop-config', title: 'Claude Desktop Setup' },
           { id: 'mcp-tools', title: 'Exposed MCP Tools' },
@@ -398,7 +398,7 @@ When user CUST-44912 (email: billing@partner.org) charges over $500, trigger web
             </h4>
             <ul className="list-disc pl-5 space-y-2 text-xs">
               <li>
-                <strong className="text-[var(--text)]">clean_ai_watermarks:</strong> Strips invisible Unicode zero-width watermarks (Anthropic Claude & ChatGPT markers).
+                <strong className="text-[var(--text)]">clean_ai_watermarks:</strong> Removes selected invisible Unicode and copy artifacts without identifying a source model.
               </li>
               <li>
                 <strong className="text-[var(--text)]">scrub_text:</strong> Sanitizes raw logs and text into safe tokens before sending across API boundaries.
@@ -530,7 +530,7 @@ When user CUST-44912 (email: billing@partner.org) charges over $500, trigger web
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
               <div className="p-3 rounded-lg bg-[var(--surface-sunken)] border border-[var(--line)]">
                 <strong className="block text-[var(--text)] font-semibold mb-1">Images & C2PA</strong>
-                <span>JPEG (EXIF/GPS/XMP/APP11), PNG (tEXt/caPI), WebP, SVG</span>
+                <span>JPEG and PNG: inspect, edit, and strip supported metadata. WebP: strip EXIF/XMP while preserving image frames.</span>
               </div>
               <div className="p-3 rounded-lg bg-[var(--surface-sunken)] border border-[var(--line)] sm:col-span-2">
                 <strong className="block text-[var(--text)] font-semibold mb-1">Current browser support</strong>

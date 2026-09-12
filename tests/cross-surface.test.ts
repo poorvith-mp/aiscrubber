@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
@@ -9,6 +9,39 @@ import { defaultDetectors, scrubText } from '../src/lib/scrub';
 const fixture = 'Email a@example.com card 4111 1111 1111 1111 Aadhaar 2345 6789 0124';
 
 describe('shared scrub engine surfaces', () => {
+  test('text inspection does not invent C2PA provenance from ordinary words', () => {
+    const result = spawnSync(process.execPath, ['bin/aiscrubber.js', 'inspect', 'OpenAI c2pa caPI jumbo Adobe', '--json'], { encoding: 'utf8' });
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout).details.c2pa).toBeUndefined();
+  });
+
+  test('CLI restoration preserves literal dollar replacement patterns', () => {
+    const temp = mkdtempSync(join(tmpdir(), 'aiscrubber-'));
+    try {
+      const key = join(temp, 'key.json');
+      const output = join(temp, 'restored.txt');
+      writeFileSync(key, JSON.stringify({ variables: { '{{SECRET_1}}': 'value$&$$tail' } }));
+      const result = spawnSync(process.execPath, ['bin/aiscrubber.js', 'unmask', '{{SECRET_1}}', '--key', key, '-o', output], { encoding: 'utf8' });
+      expect(result.status).toBe(0);
+      expect(readFileSync(output, 'utf8')).toBe('value$&$$tail');
+    } finally {
+      rmSync(temp, { recursive: true, force: true });
+    }
+  });
+
+  test('CLI refuses unsafe PDF rewriting and reports invalid commands as errors', () => {
+    const temp = mkdtempSync(join(tmpdir(), 'aiscrubber-'));
+    try {
+      const input = join(temp, 'draft.pdf');
+      writeFileSync(input, '%PDF-1.4 /Author (Private)');
+      const result = spawnSync(process.execPath, ['bin/aiscrubber.js', 'strip-metadata', input], { encoding: 'utf8' });
+      expect(result.status).toBe(1);
+      expect(existsSync(join(temp, 'draft_sanitized.pdf'))).toBe(false);
+      expect(spawnSync(process.execPath, ['bin/aiscrubber.js', 'bad-command']).status).toBe(1);
+    } finally {
+      rmSync(temp, { recursive: true, force: true });
+    }
+  });
   test('browser adapter, CLI, and MCP emit the same scrubbed text', () => {
     const browser = scrubText(fixture, new Set(defaultDetectors.map(({ id }) => id))).text;
     const cli = spawnSync(process.execPath, ['bin/aiscrubber.js', 'scrub', fixture, '--json'], { cwd: process.cwd(), encoding: 'utf8' });
@@ -88,6 +121,10 @@ describe('shared scrub engine surfaces', () => {
       });
       expect(cli.status).toBe(0);
       expect(readFileSync(output).includes(Buffer.from('tEXt'))).toBe(false);
+      writeFileSync(output, 'existing output');
+      const repeated = spawnSync(process.execPath, ['bin/aiscrubber.js', 'strip-metadata', input], { encoding: 'utf8' });
+      expect(repeated.status).toBe(1);
+      expect(readFileSync(output, 'utf8')).toBe('existing output');
     } finally {
       rmSync(temp, { recursive: true, force: true });
     }

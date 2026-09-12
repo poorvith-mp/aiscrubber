@@ -162,7 +162,7 @@ describe('metadata engine', () => {
     }
     vi.stubGlobal('Image', BrokenImage);
     vi.stubGlobal('URL', { createObjectURL: () => 'blob:fixture', revokeObjectURL: vi.fn() });
-    const source = fileLike('broken.webp', 'image/webp', new Uint8Array([1, 2]));
+    const source = fileLike('broken.gif', 'image/gif', new Uint8Array([1, 2]));
     expect(await stripMetadataUniversal(source)).toBe(source);
   });
 
@@ -190,7 +190,7 @@ describe('metadata engine', () => {
     }
     vi.stubGlobal('Image', LoadedImage);
     vi.stubGlobal('URL', { createObjectURL: () => 'blob:fixture', revokeObjectURL: vi.fn() });
-    const source = fileLike('photo.webp', 'image/webp', new Uint8Array([1, 2]));
+    const source = fileLike('photo.gif', 'image/gif', new Uint8Array([1, 2]));
 
     vi.stubGlobal('document', { createElement: () => ({ getContext: () => null }) });
     expect(await stripMetadataUniversal(source)).toBe(source);
@@ -232,6 +232,8 @@ describe('metadata engine', () => {
     // Flag bit 3 for EXIF should be cleared
     expect(strippedBuf[20]).toBe(0x00);
     expect(strippedBuf.readUInt32LE(4)).toBe(strippedBuf.length - 8);
+    const exported = await stripMetadataUniversal(fileLike('frames.webp', 'image/webp', new Uint8Array(fullWebp)));
+    expect(Buffer.from(await exported.arrayBuffer())).toEqual(strippedBuf);
   });
 
 });

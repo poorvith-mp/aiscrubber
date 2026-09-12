@@ -12,7 +12,7 @@ AIScrubber is a browser-local privacy toolkit for cleaning sensitive text and im
 - Metadata Desk inspects JPEG, PNG, and WebP images and removes supported EXIF, GPS, PNG text, and C2PA-compatible metadata markers.
 - Media Redactor permanently burns blur, pixelation, or blackout regions into an exported image.
 
-The browser tools process user content in local memory. The site fetches the repository's public GitHub star count, but no pasted text, files, mappings, or session keys are sent with that request.
+The browser tools process user content in local memory. The site loads Google Fonts and fetches the repository's public GitHub star count. Neither request includes pasted text, files, mappings, or session keys.
 
 ## Use the CLI
 
@@ -27,7 +27,7 @@ npx aiscrubber strip-metadata ./photo.jpg ./screenshot.png
 npx aiscrubber inspect ./incident.log --json
 ```
 
-`strip-metadata` currently writes sanitized copies for JPEG and PNG files. It does not rewrite PDFs or claim to verify C2PA signatures.
+`strip-metadata` writes sanitized copies for JPEG, PNG, and WebP files, preserving originals and refusing to overwrite existing outputs. PDF rewriting is unsupported. `inspect` scans UTF-8 text; use the browser Metadata Desk to inspect images. Metadata editing supports JPEG and PNG only. C2PA signatures are not verified.
 
 Use `npx aiscrubber help <command>` for command-specific examples.
 

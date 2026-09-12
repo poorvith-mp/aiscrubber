@@ -7,8 +7,8 @@
     <!-- Primary SEO Meta Tags -->
     <title>AIScrubber — Browser-Local Secret, Metadata & Unicode Cleaner</title>
     <meta name="title" content="AIScrubber — Browser-Local Secret, Metadata & Unicode Cleaner" />
-    <meta name="description" content="Browser-local privacy desk: strip C2PA Content Credentials, remove invisible Unicode artifacts, scrub PII logs into tokens, mask AI prompts, and wipe EXIF/GPS metadata in local memory." />
-    <meta name="keywords" content="c2pa remover, c2pa stripper, claude watermark remover, remove c2pa content credentials, ai watermark remover, local content processing, sanitize logs, exif stripper, mask prompt for ai, chatgpt c2pa, dall-e c2pa, poorvith m p" />
+    <meta name="description" content="Browser-local privacy desk: remove supported image metadata, remove invisible Unicode artifacts, scrub PII logs into tokens, mask AI prompts, and wipe EXIF/GPS metadata in local memory." />
+    <meta name="keywords" content="c2pa remover, c2pa stripper, remove c2pa content credentials, ai watermark remover, local content processing, sanitize logs, exif stripper, mask prompt for ai, chatgpt c2pa, dall-e c2pa, poorvith m p" />
     <meta name="author" content="Poorvith M P" />
     <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
     <meta name="theme-color" content="#f8fafc" />
@@ -38,8 +38,8 @@
 
     <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@poorvithmp" />
-    <meta name="twitter:creator" content="@poorvithmp" />
+    <meta name="twitter:site" content="@poorvith_mp" />
+    <meta name="twitter:creator" content="@poorvith_mp" />
     <meta name="twitter:title" content="AIScrubber — Browser-Local Secret, Metadata & Unicode Cleaner" />
     <meta name="twitter:description" content="Sanitize text, prompts, C2PA provenance, EXIF metadata, and visual media locally without uploading your content." />
     <meta name="twitter:image" content="https://aiscrubber.poorvithmp.com/og.png" />
@@ -57,7 +57,7 @@
           "applicationCategory": "SecurityApplication",
           "operatingSystem": "All modern browsers (Chrome, Firefox, Safari, Edge)",
           "browserRequirements": "Requires JavaScript. 100% Client-side.",
-          "description": "Browser-local privacy desk and developer CLI to strip C2PA Content Credentials, remove invisible Unicode artifacts, mask sensitive variables in AI prompts, scrub PII logs, and sanitize EXIF/GPS metadata.",
+          "description": "Browser-local privacy desk and developer CLI to remove supported image metadata, remove invisible Unicode artifacts, mask sensitive variables in AI prompts, scrub PII logs, and sanitize EXIF/GPS metadata.",
           "offers": {
             "@type": "Offer",
             "price": "0",
@@ -69,7 +69,7 @@
             "url": "https://poorvithmp.com",
             "sameAs": [
               "https://github.com/poorvith-mp",
-              "https://x.com/poorvithmp",
+              "https://x.com/poorvith_mp",
               "https://linkedin.com/in/poorvithmp"
             ]
           }
@@ -80,7 +80,7 @@
           "mainEntity": [
             {
               "@type": "Question",
-              "name": "How does AIScrubber strip C2PA Content Credentials?",
+              "name": "How does AIScrubber remove supported image metadata?",
               "acceptedAnswer": {
                 "@type": "Answer",
                 "text": "AIScrubber detects C2PA-compatible APP11 and PNG metadata markers in local browser memory and can remove them during image cleanup. It does not verify cryptographic signatures or identify the issuing vendor."
@@ -91,12 +91,12 @@
               "name": "Does AIScrubber send any of my text, logs, or photos to a server?",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "No user-provided content is uploaded. Regex matching, canvas redactions, binary metadata edits, and invisible-character cleaning happen in client-side memory. The site makes a separate request for the public GitHub star count; that request contains no user content."
+                "text": "No user-provided content is uploaded. Regex matching, canvas redactions, binary metadata edits, and invisible-character cleaning happen in client-side memory. The site loads Google Fonts and a public GitHub star count; those requests contain no user content."
               }
             },
             {
               "@type": "Question",
-              "name": "How does the AI Text & Claude Watermark Remover work?",
+              "name": "How does the Unicode Cleaner work?",
               "acceptedAnswer": {
                 "@type": "Answer",
                 "text": "It scans text for selected zero-width characters, Unicode Tag Plane tokens, variation selectors, non-standard spaces, confusable characters, and optional literal copy patterns. Findings do not identify the source model or prove a vendor watermark."

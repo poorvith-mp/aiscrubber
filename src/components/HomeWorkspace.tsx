@@ -237,7 +237,8 @@ Contact Customer: [EMAIL_1] (Card: [CARD_1])`;
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pt-4">
           {/* Card 1: Text Scrubber */}
-          <div
+          <a
+            href="#scrub"
             onClick={() => onSelectTool('scrub')}
             className="p-6 rounded-3xl bg-[var(--panel)] border border-[var(--line)] hover:border-[var(--accent)] cursor-pointer group transition-all duration-300 hover:-translate-y-1 shadow-lg space-y-4"
           >
@@ -255,10 +256,11 @@ Contact Customer: [EMAIL_1] (Card: [CARD_1])`;
                 Scan logs, emails, and source code against 9 built-in detector classes plus custom rules. Review a tokenized diff before sharing.
               </p>
             </div>
-          </div>
+          </a>
 
           {/* Card 2: Prompt Enhancer */}
-          <div
+          <a
+            href="#prompt"
             onClick={() => onSelectTool('prompt')}
             className="p-6 rounded-3xl bg-[var(--panel)] border border-[var(--line)] hover:border-[var(--accent)] cursor-pointer group transition-all duration-300 hover:-translate-y-1 shadow-lg space-y-4"
           >
@@ -276,10 +278,11 @@ Contact Customer: [EMAIL_1] (Card: [CARD_1])`;
                 Mask confidential variables with constants (`{'{{API_KEY_1}}'}`), download a session key, query ChatGPT/Claude safely, and restore AI responses in 1 click.
               </p>
             </div>
-          </div>
+          </a>
 
           {/* Card 3: AI Watermark Remover (NEW) */}
-          <div
+          <a
+            href="#watermark"
             onClick={() => onSelectTool('watermark')}
             className="p-6 rounded-3xl bg-[var(--panel)] border-2 border-[var(--accent)] hover:scale-[1.02] cursor-pointer group transition-all duration-300 shadow-xl space-y-4 relative overflow-hidden"
           >
@@ -300,10 +303,11 @@ Contact Customer: [EMAIL_1] (Card: [CARD_1])`;
                 Remove selected zero-width and Tag Plane markers (`\u200B`, `\uFEFF`), normalize synthetic spaces, flag confusables, and optionally clean AI-style copy patterns.
               </p>
             </div>
-          </div>
+          </a>
 
           {/* Card 4: Metadata & C2PA Desk */}
-          <div
+          <a
+            href="#metadata"
             onClick={() => onSelectTool('metadata')}
             className="p-6 rounded-3xl bg-[var(--panel)] border border-[var(--line)] hover:border-[var(--accent)] cursor-pointer group transition-all duration-300 hover:-translate-y-1 shadow-lg space-y-4"
           >
@@ -321,10 +325,11 @@ Contact Customer: [EMAIL_1] (Card: [CARD_1])`;
                 Inspect C2PA-compatible markers, edit standard author tags, and remove supported EXIF/GPS metadata from images locally.
               </p>
             </div>
-          </div>
+          </a>
 
           {/* Card 5: Visual Redactor */}
-          <div
+          <a
+            href="#media"
             onClick={() => onSelectTool('media')}
             className="p-6 rounded-3xl bg-[var(--panel)] border border-[var(--line)] hover:border-[var(--accent)] cursor-pointer group transition-all duration-300 hover:-translate-y-1 shadow-lg space-y-4 md:col-span-2 lg:col-span-2"
           >
@@ -342,7 +347,7 @@ Contact Customer: [EMAIL_1] (Card: [CARD_1])`;
                 Interactive HTML5 Canvas tool to blur faces, pixelate sensitive credentials, and black out private numbers in screenshots before public sharing.
               </p>
             </div>
-          </div>
+          </a>
         </div>
       </section>
 
