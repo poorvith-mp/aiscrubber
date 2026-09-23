@@ -1,8 +1,8 @@
-> **SUPERSEDED — 2026-08-24.** This file described a cold launch on 2026-09-01 with no pre-launch phase.
-> That has been replaced by a three-week pre-launch, launch, post-launch cycle. The current AIScrubber
-> campaign lives at [`launch/aiscrubber.md`](../../launch/aiscrubber.md), and the portfolio-wide
-> calendar at [`launch/launch.md`](../../launch/launch.md).
-> Kept below for reference. The Show HN and Product Hunt copy here has been rewritten in the new file.
+> **SUPERSEDED, DO NOT PUBLISH.** The current campaign lives in the dated files under
+> `personal-brand/posts/2026/10-October/06-10-2026` through `13-10-2026`; the active calendar is
+> `personal-brand/posts/README.md`. The live repository and `personal-brand/ideas/aiscrubber/` are the
+> product truth. The old claims, dates, generated HN body, and generated Product Hunt comment below are
+> retained only as history and must not be reused.
 
 # launch.md — AIScrubber Go-To-Market
 
