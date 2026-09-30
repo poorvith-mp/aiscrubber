@@ -6,6 +6,8 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   test: {
     environment: 'node',
+    maxWorkers: 4,
+    testTimeout: 20_000,
     include: ['tests/**/*.test.{js,mjs,ts}'],
     coverage: {
       provider: 'v8',

@@ -30,7 +30,7 @@ export async function processTextBatch(
   const results: TextBatchResult[] = [];
   for (let index = 0; index < files.length; index++) {
     const file = files[index];
-    const id = `text-${index + 1}-${crypto.randomUUID()}`;
+    const id = `text-${index + 1}`;
     if (signal?.aborted) {
       results.push({ ...file, id, status: 'cancelled' });
       continue;

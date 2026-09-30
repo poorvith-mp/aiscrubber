@@ -1,7 +1,15 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { processTextBatch, validateBatchSelection } from '../src/lib/textBatch';
 
 describe('text batch limits', () => {
+  test('uses stable neutral IDs without a Web Crypto global', async () => {
+    vi.stubGlobal('crypto', undefined);
+    try {
+      const result = await processTextBatch([{ name: 'private.txt', size: 1, text: 'a' }], async (item) => item.text!);
+      expect(result[0].id).toBe('text-1');
+      expect(result[0].output).toBe('a');
+    } finally { vi.unstubAllGlobals(); }
+  });
   test('accepts exactly 20 files and rejects 21 without dropping any', () => {
     expect(() => validateBatchSelection(Array.from({ length: 20 }, (_, index) => ({ name: `${index}.txt`, size: 1 })))).not.toThrow();
     expect(() => validateBatchSelection(Array.from({ length: 21 }, () => ({ name: 'same.txt', size: 1 })))).toThrow('20 files');
