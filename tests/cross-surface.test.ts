@@ -93,12 +93,22 @@ describe('shared scrub engine surfaces', () => {
   });
 
   test('scrubs 100 KB in less than 500 ms', () => {
-    const source = 'a@example.com 2001:db8::1 4111 1111 1111 1111\n'.repeat(2_000).slice(0, 100_000);
-    const started = performance.now();
-    const result = scrubText(source, new Set(defaultDetectors.map(({ id }) => id)), []);
+    // Measure the production engine without Vitest coverage instrumentation.
+    const env = { ...process.env };
+    delete env.NODE_V8_COVERAGE;
+    const benchmark = spawnSync(process.execPath, ['--input-type=module', '-e', `
+      import { detectorDefinitions, scrubBuiltIns } from './src/lib/scrubCore.js';
+      const source = 'a@example.com 2001:db8::1 4111 1111 1111 1111\\n'.repeat(2_000).slice(0, 100_000);
+      const enabled = new Set(detectorDefinitions.map(({ id }) => id));
+      const started = performance.now();
+      const result = scrubBuiltIns(source, enabled, { customRules: [] });
+      const elapsed = performance.now() - started;
+      console.log(JSON.stringify({ elapsed, totalRedactions: result.totalRedactions }));
+    `], { cwd: process.cwd(), encoding: 'utf8', env, timeout: 10_000 });
+    expect(benchmark.status, benchmark.stderr).toBe(0);
+    const result = JSON.parse(benchmark.stdout);
     expect(result.totalRedactions).toBeGreaterThan(1_000);
-    // V8 coverage instrumentation roughly doubles this hot-path runtime.
-    expect(performance.now() - started).toBeLessThan(process.env.NODE_V8_COVERAGE ? 1_500 : 500);
+    expect(result.elapsed).toBeLessThan(500);
   });
 
   test('CLI metadata stripping writes a sanitized PNG instead of reporting a no-op', () => {

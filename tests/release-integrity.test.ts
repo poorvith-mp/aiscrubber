@@ -6,6 +6,13 @@ const root = path.resolve(__dirname, '..');
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 
 describe('release integrity', () => {
+  test('requests unmodified HTML without disabling asset compression', () => {
+    const headers = fs.readFileSync(path.join(root, 'public', '_headers'), 'utf8');
+    for (const pathname of ['/', '/index.html', '/guides/*']) {
+      expect(headers.replace(/\r/g, '')).toContain(`${pathname}\n  Cache-Control: public, max-age=0, must-revalidate, no-transform`);
+    }
+    expect(headers).not.toMatch(/^\/\*\r?\n/m);
+  });
   test('declares the approved v3 source version and packages shared runtime files', () => {
     expect(pkg.version).toBe('3.0.0');
     expect(pkg.files).toEqual(expect.arrayContaining([
