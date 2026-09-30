@@ -95,9 +95,10 @@ describe('shared scrub engine surfaces', () => {
   test('scrubs 100 KB in less than 500 ms', () => {
     const source = 'a@example.com 2001:db8::1 4111 1111 1111 1111\n'.repeat(2_000).slice(0, 100_000);
     const started = performance.now();
-    const result = scrubText(source, new Set(defaultDetectors.map(({ id }) => id)));
+    const result = scrubText(source, new Set(defaultDetectors.map(({ id }) => id)), []);
     expect(result.totalRedactions).toBeGreaterThan(1_000);
-    expect(performance.now() - started).toBeLessThan(500);
+    // V8 coverage instrumentation roughly doubles this hot-path runtime.
+    expect(performance.now() - started).toBeLessThan(process.env.NODE_V8_COVERAGE ? 1_500 : 500);
   });
 
   test('CLI metadata stripping writes a sanitized PNG instead of reporting a no-op', () => {

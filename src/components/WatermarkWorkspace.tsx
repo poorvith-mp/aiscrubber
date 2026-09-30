@@ -28,8 +28,9 @@ import {
   inspectWatermarks,
   type WatermarkCleaningOptions,
 } from '../lib/watermark';
+import type { WorkflowSuccessKind } from '../lib/sponsorship';
 
-export function WatermarkWorkspace() {
+export function WatermarkWorkspace({ onWorkflowSuccess }: { onWorkflowSuccess: (kind: WorkflowSuccessKind) => void }) {
   const [inputText, setInputText] = useState('');
   const [mode, setMode] = useState<WatermarkCleaningOptions['mode']>('all');
   const [viewTab, setViewTab] = useState<'editor' | 'heatmap'>('editor');
@@ -75,6 +76,7 @@ export function WatermarkWorkspace() {
   const copyToClipboard = async () => {
     await navigator.clipboard.writeText(cleaningResult.cleanedText);
     setCopied(true);
+    onWorkflowSuccess('unicode-copy');
     setTimeout(() => setCopied(false), 1800);
   };
 
@@ -98,6 +100,7 @@ export function WatermarkWorkspace() {
     a.download = 'cleaned_ai_text.txt';
     a.click();
     URL.revokeObjectURL(url);
+    onWorkflowSuccess('unicode-download');
   };
 
   return (

@@ -2,11 +2,11 @@ import { describe, expect, test } from 'vitest';
 import { handleMessage } from '../bin/lib/mcpServer.js';
 
 describe('MCP Server with Rules & Reload', () => {
-  test('initialize and tools/list include reload_rules', () => {
-    const initRes = handleMessage({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
-    expect(initRes.result.serverInfo.version).toBe('2.4.0');
+  test('initialize and tools/list include reload_rules', async () => {
+    const initRes = await handleMessage({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
+    expect(initRes.result.serverInfo.version).toBe('3.0.0');
 
-    const toolsRes = handleMessage({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} });
+    const toolsRes = await handleMessage({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} });
     const toolNames = toolsRes.result.tools.map((t) => t.name);
     expect(toolNames).toContain('reload_rules');
     expect(toolNames).toContain('scrub_text');
@@ -18,8 +18,8 @@ describe('MCP Server with Rules & Reload', () => {
     expect(scrubTool.inputSchema.properties.customRules).toBeDefined();
   });
 
-  test('reload_rules returns rulesSource, customRuleCount, allowlistCount', () => {
-    const res = handleMessage({
+  test('reload_rules returns rulesSource, customRuleCount, allowlistCount', async () => {
+    const res = await handleMessage({
       jsonrpc: '2.0',
       id: 3,
       method: 'tools/call',
@@ -32,8 +32,8 @@ describe('MCP Server with Rules & Reload', () => {
     expect(typeof data.allowlistCount).toBe('number');
   });
 
-  test('scrub_text applies per-call customRules and allowlist and includes rulesSource', () => {
-    const res = handleMessage({
+  test('scrub_text applies per-call customRules and allowlist and includes rulesSource', async () => {
+    const res = await handleMessage({
       jsonrpc: '2.0',
       id: 4,
       method: 'tools/call',
@@ -64,8 +64,8 @@ describe('MCP Server with Rules & Reload', () => {
     expect(data.scrubbed).toContain('FLAG_SECRET_99');
   });
 
-  test('inspect_content applies customRules and includes rulesSource', () => {
-    const res = handleMessage({
+  test('inspect_content applies customRules and includes rulesSource', async () => {
+    const res = await handleMessage({
       jsonrpc: '2.0',
       id: 5,
       method: 'tools/call',
@@ -93,8 +93,8 @@ describe('MCP Server with Rules & Reload', () => {
     expect(data.threats.some((t) => t.includes('Apollo Codename'))).toBe(true);
   });
 
-  test('clean_ai_watermarks includes rulesSource', () => {
-    const res = handleMessage({
+  test('clean_ai_watermarks includes rulesSource', async () => {
+    const res = await handleMessage({
       jsonrpc: '2.0',
       id: 6,
       method: 'tools/call',

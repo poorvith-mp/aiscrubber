@@ -13,8 +13,13 @@
 Content processing occurs in browser memory or local Node.js CLI processes. The website loads Google Fonts and a public GitHub star count without including user content. Session mapping files contain original values and must stay private.
 
 ## Developer CLI & MCP
-- Run standalone via NPX: `npx aiscrubber clean-watermarks <file>`, `npx aiscrubber scrub <file>`, `npx aiscrubber mask <prompt>`, `npx aiscrubber unmask <response> --key <key.json>`.
+- Run standalone via NPX: `npx aiscrubber clean-watermarks <file>`, `npx aiscrubber scrub <file>`, `npx aiscrubber mask <prompt> --key <new-key.json>`, `npx aiscrubber unmask <response> --key <key.json>`.
 - MCP server command: `npx -y aiscrubber mcp`.
+
+## Task guides
+- https://aiscrubber.poorvithmp.com/guides/scrub-logs-before-sharing/
+- https://aiscrubber.poorvithmp.com/guides/mask-and-restore-ai-prompts/
+- https://aiscrubber.poorvithmp.com/guides/hide-private-details-in-text/
 
 ## Creator
 Built by Poorvith M P, student developer.

@@ -8,12 +8,14 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { detectorDefinitions, scrubBuiltIns } from '../src/lib/scrubCore.js';
+import { createRequire } from 'node:module';
+import { detectorDefinitions } from '../src/lib/scrubCore.js';
+import { runTextJob, MAX_NODE_INPUT_BYTES } from './lib/runTextJob.js';
 import { streamScrubFile } from './lib/streamScrub.js';
 import { runCheck } from './lib/checkCommand.js';
 import { loadConfig } from './lib/rulesLoader.js';
 
-const VERSION = '2.4.0';
+const VERSION = createRequire(import.meta.url)('../package.json').version;
 
 const HOMOGLYPH_MAP = {
   'а': 'a', 'А': 'A', 'с': 'c', 'С': 'C', 'е': 'e', 'Е': 'E', 'о': 'o', 'О': 'O',
@@ -306,60 +308,46 @@ function cleanWatermarks(content) {
 }
 
 // Scrub Text
-function scrubText(content, options = {}) {
-  const result = scrubBuiltIns(content, undefined, options);
+async function scrubText(content, options = {}) {
+  const { result } = await runTextJob({ jobId: 1, revision: 1, operation: 'scrub', source: content,
+    config: options.config || { version: 1, customRules: options.customRules || [], allowlist: options.allowlist || [] }, suppressEntropy: options.suppressEntropy });
   return {
     scrubbed: result.text,
-    mappings: Object.fromEntries(result.mappings.map(({ original, token }) => [original, token])),
-    counts: Object.fromEntries(result.mappings.map(({ token, original, count }) => [token, { original, count }])),
+    counts: result.counts,
     totalReplaced: result.totalRedactions,
   };
 }
 
 // Mask Prompt for AI
-function maskPrompt(prompt, options = {}) {
-  const scrubbed = scrubBuiltIns(prompt, undefined, options);
-  let masked = scrubbed.text;
+async function maskPrompt(prompt, options = {}) {
+  const { result: scrubbed } = await runTextJob({ jobId: 1, revision: 1, operation: 'mask', source: prompt, config: options.config || { version: 1 } });
   const sessionKey = {
-    id: `aiscrub_${Date.now()}`,
-    createdAt: new Date().toISOString(),
-    variables: {},
+    format: 'aiscrubber-session',
+    version: 2,
+    variables: scrubbed.mappings.map(({ token, original, detectorId }) => ({
+      placeholder: token,
+      original,
+      detectorId,
+    })),
   };
-  for (const { token, original } of scrubbed.mappings) {
-    const placeholder = token.replace('[', '{{').replace(']', '}}');
-    masked = masked.split(token).join(placeholder);
-    sessionKey.variables[placeholder] = original;
-  }
-  return { masked, sessionKey };
+  return { masked: scrubbed.text, sessionKey };
 }
 
 // Unmask AI Response
-function unmaskResponse(aiContent, sessionKeyObj) {
-  let unmasked = aiContent;
-  const variables = sessionKeyObj.variables || {};
-  let restoredCount = 0;
-
-  for (const [placeholder, original] of Object.entries(variables)) {
-    const escaped = placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(escaped, 'g');
-    const count = (unmasked.match(regex) || []).length;
-    if (count > 0) {
-      unmasked = unmasked.replace(regex, () => original);
-      restoredCount += count;
-    }
-  }
-
-  return { unmasked, restoredCount };
+async function unmaskResponse(aiContent, sessionKeyObj) {
+  const { result: restored } = await runTextJob({ jobId: 1, revision: 1, operation: 'restore', source: aiContent, config: { version: 1 }, sessionKey: sessionKeyObj });
+  return { unmasked: restored.text, restoredCount: restored.restoredCount, unresolvedPlaceholders: restored.unresolvedPlaceholders };
 }
 
 // Inspect File / Content
-function inspectContent(target, options = {}) {
+async function inspectContent(target, options = {}) {
   const isFile = fs.existsSync(target);
   let content = target;
   let fileStats = null;
 
   if (isFile) {
     fileStats = fs.statSync(target);
+    if (fileStats.size > MAX_NODE_INPUT_BYTES) throw Object.assign(new Error('Inspection input exceeds 64 MiB'), { exitCode: 2 });
     const buffer = fs.readFileSync(target);
     content = buffer.toString('utf8');
   }
@@ -368,7 +356,8 @@ function inspectContent(target, options = {}) {
   const details = {};
 
   // Check text detectors
-  const scrubbed = scrubBuiltIns(content, undefined, options);
+  const { result: scrubbed } = await runTextJob({ jobId: 1, revision: 1, operation: 'scrub', source: content,
+    config: options.config || { version: 1, customRules: options.customRules || [], allowlist: options.allowlist || [] }, suppressEntropy: options.suppressEntropy });
   for (const detector of detectorDefinitions) {
     const count = scrubbed.counts[detector.id] || 0;
     if (count) threats.push(`${detector.label} exposed (${count} instance${count > 1 ? 's' : ''})`);
@@ -475,6 +464,7 @@ function stripWebpMetadata(buffer) {
 async function resolveInput(target) {
   if (target && target !== '-') {
     if (fs.existsSync(target)) {
+      if (fs.statSync(target).size > MAX_NODE_INPUT_BYTES) throw Object.assign(new Error('Text input exceeds 64 MiB; use scrub --stream with a distinct --output for large files.'), { exitCode: 2 });
       return fs.readFileSync(target, 'utf-8');
     }
     return target;
@@ -482,10 +472,17 @@ async function resolveInput(target) {
 
   // Only read stdin if explicit '-' or no target provided AND stdin is not a TTY
   if ((target === '-' || !target) && !process.stdin.isTTY) {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       let data = '';
+      let bytes = 0;
       process.stdin.setEncoding('utf-8');
       process.stdin.on('data', (chunk) => {
+        bytes += Buffer.byteLength(chunk, 'utf8');
+        if (bytes > MAX_NODE_INPUT_BYTES) {
+          process.stdin.pause();
+          reject(Object.assign(new Error('Text input exceeds 64 MiB'), { exitCode: 2 }));
+          return;
+        }
         data += chunk;
       });
       process.stdin.on('end', () => {
@@ -557,6 +554,7 @@ async function run() {
         json,
         verbose,
         configPath,
+        noConfig: args.includes('--no-config'),
         suppressEntropy: !noSuppress,
       });
       process.exit(exitCode);
@@ -629,7 +627,7 @@ async function run() {
     }
 
     const isFile = target && target !== '-' && fs.existsSync(target) && fs.statSync(target).isFile();
-    const isLarge = isFile && fs.statSync(target).size > 64 * 1024 * 1024;
+    const isLarge = isFile && fs.statSync(target).size > MAX_NODE_INPUT_BYTES;
 
     if (isFile && (isLarge || forceStream)) {
       try {
@@ -640,6 +638,7 @@ async function run() {
           customRules: loadedConfig.customRules,
           allowlist: loadedConfig.allowlist,
           suppressEntropy: !noSuppress,
+          enabledDetectorIds: loadedConfig.enabledDetectorIds,
         });
         if (outputPath) {
           console.log(`\x1b[32m✔ Scrubbed stream successfully!\x1b[0m Replaced ${stats.totalRedactions} sensitive tokens in ${(stats.bytesProcessed / (1024 * 1024)).toFixed(1)} MiB. Saved to \x1b[1m${outputPath}\x1b[0m`);
@@ -659,7 +658,8 @@ async function run() {
       process.exit(1);
     }
 
-    const { scrubbed, counts, totalReplaced } = scrubText(inputContent, {
+    const { scrubbed, counts, totalReplaced } = await scrubText(inputContent, {
+      config: loadedConfig.config,
       customRules: loadedConfig.customRules,
       allowlist: loadedConfig.allowlist,
       suppressEntropy: !noSuppress,
@@ -669,7 +669,7 @@ async function run() {
       fs.writeFileSync(outputPath, scrubbed, 'utf-8');
       console.log(`\x1b[32m✔ Scrubbed successfully!\x1b[0m Replaced ${totalReplaced} sensitive tokens. Saved to \x1b[1m${outputPath}\x1b[0m`);
     } else if (args.includes('-j') || args.includes('--json')) {
-      console.log(JSON.stringify({ scrubbed, counts, totalReplaced }, null, 2));
+      console.log(JSON.stringify({ scrubbed, counts, totalReplaced, rulesSource: loadedConfig.source }, null, 2));
     } else {
       console.log(scrubbed);
     }
@@ -687,20 +687,43 @@ async function run() {
       process.exit(1);
     }
 
-    const { masked, sessionKey } = maskPrompt(promptContent);
-
     const keyIndex = args.findIndex((a) => a === '-k' || a === '--key');
-    const keyPath = keyIndex !== -1 && args[keyIndex + 1] ? args[keyIndex + 1] : 'session.aiscrub.json';
-    fs.writeFileSync(keyPath, JSON.stringify(sessionKey, null, 2), 'utf-8');
-
     const outIndex = args.findIndex((a) => a === '-o' || a === '--output');
-    if (outIndex !== -1 && args[outIndex + 1]) {
-      fs.writeFileSync(args[outIndex + 1], masked, 'utf-8');
+    if (keyIndex === -1 || !args[keyIndex + 1]) {
+      console.error('\x1b[31mError:\x1b[0m mask requires an explicit --key <path>.');
+      process.exit(2);
+    }
+    const keyPath = args[keyIndex + 1];
+    const outputPath = outIndex !== -1 && args[outIndex + 1] ? args[outIndex + 1] : null;
+    const destinations = [keyPath, outputPath].filter(Boolean);
+    const existing = destinations.find((destination) => fs.existsSync(destination));
+    if (existing) {
+      console.error(`\x1b[31mError:\x1b[0m Refusing to overwrite existing file '${existing}'.`);
+      process.exit(2);
+    }
+
+    const configIndex = args.indexOf('--config');
+    const loadedConfig = loadConfig({ explicitPath: configIndex >= 0 ? args[configIndex + 1] : null });
+    const { masked, sessionKey } = await maskPrompt(promptContent, { config: loadedConfig.config });
+    const created = [];
+    try {
+      if (outputPath) {
+        fs.writeFileSync(outputPath, masked, { encoding: 'utf-8', flag: 'wx' });
+        created.push(outputPath);
+      }
+      fs.writeFileSync(keyPath, JSON.stringify(sessionKey, null, 2), { encoding: 'utf-8', flag: 'wx' });
+      created.push(keyPath);
+    } catch (err) {
+      for (const destination of created) fs.rmSync(destination, { force: true });
+      console.error(`\x1b[31mError:\x1b[0m ${err.message}`);
+      process.exit(2);
     }
 
     console.log(`\x1b[32m✔ Prompt masked successfully!\x1b[0m Session key saved to \x1b[1m${keyPath}\x1b[0m\n`);
-    console.log('\x1b[1mMasked Prompt for AI:\x1b[0m\n');
-    console.log(masked);
+    if (!outputPath) {
+      console.log('\x1b[1mMasked Prompt for AI:\x1b[0m\n');
+      console.log(masked);
+    }
     return;
   }
 
@@ -727,7 +750,8 @@ async function run() {
     }
 
     const sessionKey = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
-    const { unmasked, restoredCount } = unmaskResponse(aiContent, sessionKey);
+    const { unmasked, restoredCount, unresolvedPlaceholders } = await unmaskResponse(aiContent, sessionKey);
+    if (unresolvedPlaceholders.length) console.error(`Unresolved placeholders remain: ${unresolvedPlaceholders.join(', ')}`);
 
     const outIndex = args.findIndex((a) => a === '-o' || a === '--output');
     if (outIndex !== -1 && args[outIndex + 1]) {
@@ -814,7 +838,8 @@ async function run() {
       process.exit(1);
     }
 
-    const inspection = inspectContent(inspectionTarget, {
+    const inspection = await inspectContent(inspectionTarget, {
+      config: loadedConfig.config,
       customRules: loadedConfig.customRules,
       allowlist: loadedConfig.allowlist,
       suppressEntropy: !noSuppress,
@@ -841,6 +866,6 @@ async function run() {
 }
 
 run().catch((err) => {
-  console.error('\x1b[31mFatal error:\x1b[0m', err);
-  process.exit(1);
+  console.error('\x1b[31mError:\x1b[0m', err.message || 'Text operation failed');
+  process.exit(err.exitCode || (['TEXT_TIMEOUT', 'TEXT_CANCELLED', 'TEXT_JOB_FAILED', 'INPUT_TOO_LARGE', 'OUTPUT_TOO_LARGE'].includes(err.code) ? 2 : 1));
 });

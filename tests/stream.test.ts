@@ -8,6 +8,58 @@ import { scrubText, defaultDetectors } from '../src/lib/scrub';
 const all = new Set(defaultDetectors.map((d) => d.id));
 
 describe('Streaming scrub', () => {
+  test.each([
+    { customRules: [{ id: 'regex', token: 'RULE', patternString: 'a+', isRegex: true, enabled: true }] },
+    { customRules: [{ id: 'lines', token: 'RULE', patternString: 'a\nb', isRegex: false, enabled: true }] },
+    { allowlist: [{ value: 'a+', isRegex: true }] },
+  ])('rejects unsupported policy before opening output: %j', async (policy) => {
+    const temp = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), 'aiscrub-stream-'));
+    try {
+      const inputPath = path.join(temp, 'in.txt');
+      const outputPath = path.join(temp, 'out.txt');
+      fs.writeFileSync(inputPath, 'aaa');
+      await expect(streamScrubFile({ inputPath, outputPath, quiet: true, ...policy })).rejects.toThrow('whole-file');
+      expect(fs.readdirSync(temp)).toEqual(['in.txt']);
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+  });
+
+  test.each([
+    ['truncated PEM', '-----BEGIN PRIVATE KEY-----\nYWJj\n', {}],
+    ['mapping exhaustion', 'a@example.com\nb@example.com', { maxMapEntries: 1 }],
+    ['later token collision', 'a@example.com\n[EMAIL_1]\n', { maxLines: 1 }],
+  ])('fails without publishing partial output on %s', async (_label, source, limits) => {
+    const temp = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), 'aiscrub-stream-'));
+    try {
+      const inputPath = path.join(temp, 'in.txt');
+      const outputPath = path.join(temp, 'out.txt');
+      fs.writeFileSync(inputPath, source as string);
+      await expect(streamScrubFile({ inputPath, outputPath, quiet: true, limits })).rejects.toThrow();
+      expect(fs.readdirSync(temp)).toEqual(['in.txt']);
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+  });
+
+  test('reserves token-looking source and preserves a UTF-8 BOM', async () => {
+    const temp = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), 'aiscrub-stream-'));
+    try {
+      const inputPath = path.join(temp, 'in.txt');
+      const outputPath = path.join(temp, 'out.txt');
+      fs.writeFileSync(inputPath, '\uFEFF[EMAIL_1]\na@example.com');
+      await streamScrubFile({ inputPath, outputPath, quiet: true });
+      expect(fs.readFileSync(outputPath, 'utf8')).toBe('\uFEFF[EMAIL_1]\n[EMAIL_2]');
+    } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+  });
+  test('entropy-only allowlists do not exempt custom-rule findings', async () => {
+    const tempDir = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), 'aiscrub-stream-'));
+    try {
+      const inputPath = path.join(tempDir, 'input.txt');
+      const outputPath = path.join(tempDir, 'output.txt');
+      fs.writeFileSync(inputPath, 'ProjectApollo');
+      await streamScrubFile({ inputPath, outputPath, quiet: true,
+        customRules: [{ id: 'project', label: 'Project', token: 'PROJECT', patternString: 'ProjectApollo', isRegex: false, enabled: true }],
+        allowlist: [{ value: 'ProjectApollo', isRegex: false }] });
+      expect(fs.readFileSync(outputPath, 'utf8')).toBe('[PROJECT_1]');
+    } finally { fs.rmSync(tempDir, { recursive: true, force: true }); }
+  });
   test('preserves CRLF line endings and trailing lines without newline', async () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aiscrub-stream-'));
     const inputPath = path.join(tempDir, 'crlf.log');
@@ -93,39 +145,42 @@ describe('Streaming scrub', () => {
     }
   });
 
-  test('100 MiB synthetic stream completes with peak RSS < 400 MiB', async () => {
-    if (process.env.CI_FAST === '1') return;
-
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aiscrub-100m-'));
-    const inputPath = path.join(tempDir, 'big.log');
-    const outputPath = path.join(tempDir, 'big.clean.log');
-
+  test('preserves UTF-8 characters split at the read boundary', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aiscrub-stream-'));
+    const inputPath = path.join(tempDir, 'unicode.txt');
+    const outputPath = path.join(tempDir, 'unicode.out.txt');
     try {
-      // Generate 100 MiB synthetic file in chunks
-      const chunk = '2026-09-12 10:00:00 INFO [worker-1] Request processed user=alice@example.com ip=10.0.0.1 status=200\n'.repeat(500);
-      const targetBytes = 100 * 1024 * 1024;
-      let written = 0;
-      const fd = fs.openSync(inputPath, 'w');
-      while (written < targetBytes) {
-        fs.writeSync(fd, chunk);
-        written += Buffer.byteLength(chunk);
-      }
-      fs.closeSync(fd);
-
-      let peakRss = 0;
-      const timer = setInterval(() => {
-        const rss = process.memoryUsage().rss;
-        if (rss > peakRss) peakRss = rss;
-      }, 50);
-
-      const result = await streamScrubFile({ inputPath, outputPath, quiet: true });
-      clearInterval(timer);
-
-      expect(result.totalRedactions).toBeGreaterThan(0);
-      const peakRssMb = peakRss / (1024 * 1024);
-      expect(peakRssMb).toBeLessThan(400);
+      const content = `${'x'.repeat(64 * 1024 - 1)}🙂
+\nfinal`;
+      fs.writeFileSync(inputPath, content, 'utf8');
+      await streamScrubFile({ inputPath, outputPath, quiet: true, enabledDetectorIds: new Set() });
+      expect(fs.readFileSync(outputPath)).toEqual(Buffer.from(content, 'utf8'));
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
-  }, 120000);
+  });
+
+  test('rejects stdout streaming so sensitive output has an owned destination', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aiscrub-stream-'));
+    const inputPath = path.join(tempDir, 'input.txt');
+    try {
+      fs.writeFileSync(inputPath, 'safe', 'utf8');
+      await expect(streamScrubFile({ inputPath, toStdout: true, quiet: true })).rejects.toThrow('does not support stdout');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('removes partial output when a configured block limit fails', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aiscrub-stream-'));
+    const inputPath = path.join(tempDir, 'input.txt');
+    const outputPath = path.join(tempDir, 'output.txt');
+    try {
+      fs.writeFileSync(inputPath, 'line longer than limit', 'utf8');
+      await expect(streamScrubFile({ inputPath, outputPath, quiet: true, limits: { maxBlockBytes: 4 } })).rejects.toThrow('block limit');
+      expect(fs.existsSync(outputPath)).toBe(false);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
 });

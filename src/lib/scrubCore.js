@@ -144,7 +144,7 @@ export const detectorDefinitions = [
     /\bbearer\s+[A-Za-z0-9._~+\/-]{12,}={0,2}\b/gi,
     /\bAKIA[0-9A-Z]{16}\b/g,
     /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g,
-    /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g,
+    /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]{1,4194304}?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g,
     /\b(?:aws_secret_access_key|secret)\s*[:=]\s*["']?([A-Za-z0-9/+=]{40})["']?/gi,
     /\b(?:password|passwd|pwd|api_key|token|auth_key|secret|pass|db_pass)\s*[:=]\s*["']?([^\s"';,\r\n]+)["']?/gi,
   ], capture: (match) => match[1] || match[0] },
@@ -237,36 +237,79 @@ export function collectBuiltInMatches(source, enabledIds = new Set(detectorDefin
 }
 
 export function tokenizeMatches(source, inputMatches, options = {}) {
-  const sorted = [...inputMatches].sort((a, b) => {
+  const decisions = options.decisions || [];
+  if (!Array.isArray(decisions) || decisions.length > 1_000) throw new Error('Invalid review decisions');
+  const normalizedDecisions = decisions.map((decision) => {
+    if (!decision || !Number.isInteger(decision.start) || !Number.isInteger(decision.end)
+      || decision.start < 0 || decision.end <= decision.start || decision.end > source.length
+      || !['keep', 'hide'].includes(decision.action)) throw new Error('Invalid review decision span');
+    if ((decision.start > 0 && /[\uD800-\uDBFF]/.test(source[decision.start - 1]) && /[\uDC00-\uDFFF]/.test(source[decision.start]))
+      || (decision.end > 0 && /[\uD800-\uDBFF]/.test(source[decision.end - 1]) && /[\uDC00-\uDFFF]/.test(source[decision.end]))) {
+      throw new Error('Review decision splits a surrogate pair');
+    }
+    return { ...decision };
+  });
+  const kept = normalizedDecisions.filter(({ action }) => action === 'keep');
+  const manual = normalizedDecisions
+    .filter(({ action }) => action === 'hide')
+    .sort((a, b) => a.start - b.start || a.end - b.end)
+    .reduce((merged, span) => {
+      const previous = merged[merged.length - 1];
+      if (previous && span.start <= previous.end) previous.end = Math.max(previous.end, span.end);
+      else merged.push({ ...span });
+      return merged;
+    }, []);
+  const automatic = inputMatches.filter((match) => {
+    if (kept.some((span) => span.start === match.start && span.end === match.end)) return false;
+    return !manual.some((span) => match.start < span.end && match.end > span.start);
+  });
+  const candidates = automatic.concat(manual.map((span) => ({
+    start: span.start,
+    end: span.end,
+    value: source.slice(span.start, span.end),
+    token: 'MANUAL',
+    detectorId: 'manual',
+  })));
+  const sorted = candidates.sort((a, b) => {
     if (a.start !== b.start) return a.start - b.start;
     if (a.end !== b.end) return (b.end - b.start) - (a.end - a.start);
-    const aCustom = a.detectorId.startsWith('custom_');
-    const bCustom = b.detectorId.startsWith('custom_');
-    if (aCustom !== bCustom) return aCustom ? -1 : 1;
-    return 0;
+    if (a.detectorId === 'entropy' && b.detectorId !== 'entropy') return 1;
+    if (b.detectorId === 'entropy' && a.detectorId !== 'entropy') return -1;
+    return a.detectorId.localeCompare(b.detectorId);
   });
   const accepted = [];
   for (const match of sorted) {
-    if (!accepted.some((item) => match.start < item.end && match.end > item.start)) accepted.push(match);
+    const previous = accepted[accepted.length - 1];
+    if (!previous || match.start >= previous.end) accepted.push(match);
   }
   const assigned = new Map();
+  const mappingByToken = new Map();
   const sequences = new Map();
   const mappings = [];
   const counts = {};
   const diffSegments = [];
+  const acceptedMatches = [];
+  const tokenStyle = options.tokenStyle === 'brace' ? 'brace' : 'bracket';
+  const occupied = new Set(source.match(/\[[A-Z][A-Z0-9_]*_[0-9]+\]|\{\{[A-Z][A-Z0-9_]*_[0-9]+\}\}/g) || []);
   let cursor = 0;
   let text = '';
   for (const match of accepted) {
-    const key = `${match.token}:${match.value.toLowerCase()}`;
+    const key = `${match.token}:${match.value}`;
     let token = assigned.get(key);
     if (!token) {
-      const next = (sequences.get(match.token) || 0) + 1;
+      let next = sequences.get(match.token) || 0;
+      do {
+        next++;
+        token = tokenStyle === 'brace' ? `{{${match.token}_${next}}}` : `[${match.token}_${next}]`;
+      } while (occupied.has(token));
       sequences.set(match.token, next);
-      token = `[${match.token}_${next}]`;
+      occupied.add(token);
       assigned.set(key, token);
-      mappings.push({ token, original: match.value, detectorId: match.detectorId, count: 1 });
+      const mapping = { token, original: match.value, detectorId: match.detectorId, count: 1 };
+      mappings.push(mapping);
+      mappingByToken.set(token, mapping);
     } else {
-      mappings.find((item) => item.token === token).count++;
+      mappingByToken.get(token).count++;
     }
     if (match.start > cursor) {
       const unchanged = source.slice(cursor, match.start);
@@ -275,6 +318,7 @@ export function tokenizeMatches(source, inputMatches, options = {}) {
     }
     text += token;
     diffSegments.push({ type: 'redacted', text: token, originalValue: match.value, token, detector: match.detectorId });
+    acceptedMatches.push({ ...match, token });
     cursor = match.end;
     counts[match.detectorId] = (counts[match.detectorId] || 0) + 1;
   }
@@ -289,36 +333,32 @@ export function tokenizeMatches(source, inputMatches, options = {}) {
     counts['entropy-suppressed'] = suppressed;
   }
 
-  return { text, counts, mappings, diffSegments, totalRedactions: accepted.length };
+  return { text, counts, mappings, diffSegments, acceptedMatches, totalRedactions: accepted.length };
 }
 
 export function collectCustomMatches(source, customRules = []) {
   const matches = [];
   for (const rule of customRules) {
     if (!rule.enabled || !rule.patternString?.trim()) continue;
-    try {
-      if (rule.isRegex) {
-        const regex = new RegExp(rule.patternString, 'gi');
-        for (const match of source.matchAll(regex)) {
-          if (match.index === undefined || !match[0]) continue;
-          matches.push({ start: match.index, end: match.index + match[0].length, value: match[0], token: rule.token || 'CUSTOM', detectorId: `custom_${rule.id}` });
-        }
-      } else {
-        const lower = source.toLowerCase();
-        const target = rule.patternString.toLowerCase();
-        let pos = 0;
-        while ((pos = lower.indexOf(target, pos)) !== -1) {
-          matches.push({ start: pos, end: pos + target.length, value: source.slice(pos, pos + target.length), token: rule.token || 'CUSTOM', detectorId: `custom_${rule.id}` });
-          pos += target.length;
-        }
+    if (rule.isRegex) {
+      const regex = new RegExp(rule.patternString, 'gi');
+      for (const match of source.matchAll(regex)) {
+        if (match.index === undefined || !match[0]) continue;
+        matches.push({ start: match.index, end: match.index + match[0].length, value: match[0], token: rule.token || 'CUSTOM', detectorId: `custom_${rule.id}` });
       }
-    } catch {}
+    } else {
+      const regex = new RegExp(rule.patternString.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'giu');
+      for (const match of source.matchAll(regex)) {
+        if (match.index === undefined || !match[0]) continue;
+        matches.push({ start: match.index, end: match.index + match[0].length, value: match[0], token: rule.token || 'CUSTOM', detectorId: `custom_${rule.id}` });
+      }
+    }
   }
   return matches;
 }
 
 export function scrubBuiltIns(source, enabledIds, options = {}) {
-  if (!source) return { text: '', counts: {}, mappings: [], diffSegments: [], totalRedactions: 0 };
+  if (!source) return { text: '', counts: {}, mappings: [], diffSegments: [], acceptedMatches: [], totalRedactions: 0 };
   const matches = collectBuiltInMatches(source, enabledIds, options);
   if (options.customRules && options.customRules.length > 0) {
     const customMatches = collectCustomMatches(source, options.customRules);

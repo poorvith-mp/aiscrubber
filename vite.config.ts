@@ -10,7 +10,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json-summary'],
-      include: ['src/lib/**/*.{js,ts}'],
+      include: ['src/lib/**/*.{js,ts}', 'bin/lib/**/*.js'],
       thresholds: {
         statements: 85,
         branches: 80,

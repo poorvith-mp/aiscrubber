@@ -41,6 +41,7 @@ import {
   type FileMetadataAnalysis,
   type MetadataField,
 } from '../lib/metadata';
+import type { WorkflowSuccessKind } from '../lib/sponsorship';
 
 export interface BatchFileItem {
   id: string;
@@ -52,7 +53,7 @@ export interface BatchFileItem {
   error?: string;
 }
 
-export function MetadataWorkspace() {
+export function MetadataWorkspace({ onWorkflowSuccess }: { onWorkflowSuccess: (kind: WorkflowSuccessKind) => void }) {
   const [items, setItems] = useState<BatchFileItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
@@ -297,6 +298,7 @@ export function MetadataWorkspace() {
       a.download = `aiscrubber_batch_${Date.now()}.zip`;
       a.click();
       URL.revokeObjectURL(url);
+      onWorkflowSuccess('metadata-download');
     } catch (err) {
       alert('Error creating ZIP archive');
       console.error(err);
@@ -321,6 +323,7 @@ export function MetadataWorkspace() {
     a.download = `${base}_sanitized.${ext}`;
     a.click();
     URL.revokeObjectURL(url);
+    onWorkflowSuccess('metadata-download');
     } catch {
       setStatusMessage('Unable to sanitize this image. No file was downloaded.');
     }
@@ -356,6 +359,7 @@ export function MetadataWorkspace() {
       a.download = `${base}_custom_metadata.${ext}`;
       a.click();
       URL.revokeObjectURL(url);
+      onWorkflowSuccess('metadata-download');
     } catch (err) {
       alert('Error applying metadata edits');
       console.error(err);

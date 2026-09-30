@@ -23,8 +23,9 @@ import {
   type RedactionBox,
   type RedactionType,
 } from '../lib/mediaRedact';
+import type { WorkflowSuccessKind } from '../lib/sponsorship';
 
-export function MediaRedactorWorkspace() {
+export function MediaRedactorWorkspace({ onWorkflowSuccess }: { onWorkflowSuccess: (kind: WorkflowSuccessKind) => void }) {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [fileName, setFileName] = useState<string>('');
   const [boxes, setBoxes] = useState<RedactionBox[]>([]);
@@ -159,6 +160,7 @@ export function MediaRedactorWorkspace() {
       a.download = `${base}_redacted.png`;
       a.click();
       URL.revokeObjectURL(url);
+      onWorkflowSuccess('image-download');
     } catch (err) {
       console.error('Export failed', err);
     } finally {

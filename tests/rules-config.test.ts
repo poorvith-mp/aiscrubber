@@ -3,12 +3,52 @@ import path from 'path';
 import os from 'os';
 import { describe, expect, test } from 'vitest';
 import { loadConfig, findConfigFile, validateAndResolveConfig } from '../bin/lib/rulesLoader.js';
+import { resolveMergedConfig, validateConfig } from '../src/lib/rulesCore.js';
+import { CLEANING_PROFILES } from '../src/lib/cleaningProfiles';
 
 describe('Rules config resolution order and validation', () => {
-  test('rejects unknown top-level key with specific message', () => {
+  test('disable wins over an explicit enabled set and empty enable means none', () => {
+    const config = validateConfig({ version: 1, detectors: { enable: ['email', 'ip'], disable: ['email'] } });
+    expect([...resolveMergedConfig(config, {}).enabledDetectorIds]).toEqual(['ip']);
+    expect([...resolveMergedConfig(validateConfig({ version: 1, detectors: { enable: [] } }), {}).enabledDetectorIds]).toEqual([]);
+  });
+
+  test('validates nested fields, limits, duplicates, and sanitized regex errors', () => {
+    expect(() => validateConfig({ version: 1, detectors: { enable: ['unknown'] } })).toThrow(/detectors\.enable\[0\]/);
+    expect(() => validateConfig({ version: 1, detectors: { enable: ['email'], extra: true } })).toThrow(/unknown field/i);
+    expect(() => validateConfig({ version: 1, customRules: [
+      { id: 'same', patternString: 'a', isRegex: false, enabled: true },
+      { id: 'same', patternString: 'b', isRegex: false, enabled: true },
+    ] })).toThrow(/duplicate/i);
+    expect(() => validateConfig({ version: 1, customRules: [
+      { id: 'private', patternString: '[secret-value', isRegex: true, enabled: true },
+    ] })).toThrow('customRules[0] has invalid regex');
+  });
+
+  test('later packs and explicit rules win while allowlists deduplicate', () => {
+    const packs = {
+      first: { name: 'first', version: 1, description: '', customRules: [{ id: 'x', patternString: 'first', isRegex: false, enabled: true }] },
+      second: { name: 'second', version: 1, description: '', customRules: [{ id: 'x', patternString: 'second', isRegex: false, enabled: true }] },
+    };
+    const resolved = resolveMergedConfig(validateConfig({
+      version: 1,
+      extends: ['first', 'second'],
+      customRules: [{ id: 'x', patternString: 'explicit', isRegex: false, enabled: true }],
+      allowlist: [{ value: 'safe', isRegex: false }, { value: 'safe', isRegex: false }],
+    }), packs);
+    expect(resolved.customRules[0].patternString).toBe('explicit');
+    expect(resolved.allowlist).toEqual([{ value: 'safe', isRegex: false }]);
+  });
+
+  test('defines the approved everyday, developer, and custom profiles', () => {
+    expect(CLEANING_PROFILES.everyday.enabledDetectorIds).toEqual(['email', 'phone', 'ip', 'url', 'card', 'secret', 'entropy']);
+    expect(CLEANING_PROFILES.developer.extends).toEqual(['devops']);
+    expect(CLEANING_PROFILES.custom.enabledDetectorIds).toEqual([]);
+  });
+  test('rejects unknown top-level key without echoing private values', () => {
     expect(() => {
       validateAndResolveConfig({ version: 1, unknownField: true });
-    }).toThrow('Unknown key "unknownField" in .aiscrubrc.json');
+    }).toThrow('Config root contains unknown field "unknownField"');
   });
 
   test('rejects invalid version number', () => {
@@ -17,13 +57,13 @@ describe('Rules config resolution order and validation', () => {
     }).toThrow('Unsupported version 2 in .aiscrubrc.json; expected 1');
   });
 
-  test('rejects invalid regex in custom rule and names the rule id', () => {
+  test('rejects invalid regex by item index without echoing the private rule', () => {
     expect(() => {
       validateAndResolveConfig({
         version: 1,
         customRules: [{ id: 'broken-rule', label: 'Broken', patternString: '[a-z', isRegex: true, enabled: true }],
       });
-    }).toThrow('Invalid regex in rule "broken-rule"');
+    }).toThrow('customRules[0] has invalid regex');
   });
 
   test('extends india-ids and allows file rules to override pack rules by id', () => {

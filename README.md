@@ -33,17 +33,17 @@ Use `npx aiscrubber help <command>` for command-specific examples.
 
 ## Use as a pre-commit gate
 
-Scan committed files or git staged diff for credentials before pushing:
+Scan explicit text files or staged Git index blobs before pushing:
 
 ```bash
-# Scan git staged changes (ACM)
+# Scan staged additions, changes, and rename destinations
 npx aiscrubber check --staged
 
-# Scan specific files or directories
-npx aiscrubber check ./src ./config --json
+# Scan explicit files (directories are rejected)
+npx aiscrubber check ./src/config.ts ./incident.log --json
 ```
 
-Exit codes: `0` when clean, `1` when secrets are found, `2` on configuration error.
+Exit codes: `0` for a complete scan without findings, `1` for findings, `2` for incomplete scans or usage/configuration/IO errors. Binary staged files, symlinks, and submodules are visibly excluded; oversized or unreadable text makes the check incomplete.
 
 ### `lint-staged` configuration
 
@@ -70,7 +70,7 @@ repos:
 
 ## Large files & streaming
 
-For large server logs, database dumps, or crash files, AIScrubber automatically streams in chunks with bounded memory (peak RSS < 400 MiB on 100+ MiB files):
+Large file scrubbing uses bounded chunks. Files over 64 MiB require a distinct `--output` destination; streaming stdout is unsupported. Streaming accepts built-ins and single-line literal rules, not custom regex or regex allowlists. Mapping exhaustion, truncated private keys, invalid UTF-8, and late token collisions fail without publishing a partial file. Memory and speed depend on the workload.
 
 ```bash
 # Automatically streams files >64 MiB
@@ -111,6 +111,8 @@ Available built-in packs:
 
 ## Connect the MCP server
 
+`mask_prompt` returns a private restoration file only with `includeSessionKey: true`. `unmask_response` requires `allowSensitiveOutput: true`. Restoration keys and restored responses contain original private values; don't send the key to an AI service.
+
 AIScrubber exposes `reload_rules`, `scrub_text`, `mask_prompt`, `unmask_response`, `clean_ai_watermarks`, and `inspect_content` over stdio for Claude Desktop, Claude Code, and Cursor.
 
 ```json
@@ -125,6 +127,16 @@ AIScrubber exposes `reload_rules`, `scrub_text`, `mask_prompt`, `unmask_response
 ```
 
 Tools dynamically reflect your `.aiscrubrc.json` rules and allow runtime reload via `reload_rules` without restarting the server.
+
+## Local web workflows
+
+The website starts with an empty text editor. Choose Everyday text or Developer logs, add Words to hide, and review individual occurrences before copying or downloading. Regional and healthcare checks are opt-in. Allowlisting affects entropy suppression only, not other detectors.
+
+Text batches accept up to 20 UTF-8 TXT/LOG/MD/JSON/CSV files, 5 MiB each and 20 MiB total. Exports use neutral filenames; JSON/CSV are cleaned as text, without a schema-preservation guarantee. Masked prompts and restoration keys stay in memory unless explicitly downloaded.
+
+Successful changed-output handoffs show a sponsorship modal. Closing is available after three seconds; payment is voluntary. Sponsorship never appears in exported content, CLI, MCP, or CI output.
+
+Task guides: [clean incident logs](https://aiscrubber.poorvithmp.com/guides/scrub-logs-before-sharing/), [mask and restore prompts](https://aiscrubber.poorvithmp.com/guides/mask-and-restore-ai-prompts/), [hide private text](https://aiscrubber.poorvithmp.com/guides/hide-private-details-in-text/).
 
 ## Accuracy and safety boundaries
 

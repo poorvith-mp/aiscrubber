@@ -24,11 +24,13 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { FeedbackModal } from './components/FeedbackModal';
 import { HomeWorkspace } from './components/HomeWorkspace';
 import { PageLoader } from './components/PageLoader';
+import { SponsorshipModal } from './components/SponsorshipModal';
 import { NAV_GROUPS, viewForShortcut, viewFromHash, type ToolView } from './lib/navigation';
+import type { WorkflowSuccess, WorkflowSuccessKind } from './lib/sponsorship';
 
 const AboutWorkspace = lazy(() => import('./components/AboutWorkspace').then(({ AboutWorkspace }) => ({ default: AboutWorkspace })));
 const DocsWorkspace = lazy(() => import('./components/DocsWorkspace').then(({ DocsWorkspace }) => ({ default: DocsWorkspace })));
@@ -115,6 +117,13 @@ export function App() {
   const [starCount, setStarCount] = useState<number | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sponsorshipEvent, setSponsorshipEvent] = useState<WorkflowSuccess | null>(null);
+  const workflowEventId = useRef(0);
+
+  function handleWorkflowSuccess(kind: WorkflowSuccessKind) {
+    workflowEventId.current += 1;
+    setSponsorshipEvent({ eventId: workflowEventId.current, kind });
+  }
 
   // Sync theme
   useEffect(() => {
@@ -348,11 +357,11 @@ export function App() {
         <section id="workspace" className="transition-all duration-300">
           <Suspense fallback={<PageLoader text={`Opening ${currentView.toUpperCase()} Workspace...`} />}>
               {currentView === 'home' && <HomeWorkspace onSelectTool={switchView} />}
-              {currentView === 'scrub' && <ScrubberWorkspace />}
-              {currentView === 'prompt' && <PromptEnhancerWorkspace />}
-              {currentView === 'watermark' && <WatermarkWorkspace />}
-              {currentView === 'metadata' && <MetadataWorkspace />}
-              {currentView === 'media' && <MediaRedactorWorkspace />}
+              {currentView === 'scrub' && <ScrubberWorkspace onWorkflowSuccess={handleWorkflowSuccess} />}
+              {currentView === 'prompt' && <PromptEnhancerWorkspace onWorkflowSuccess={handleWorkflowSuccess} />}
+              {currentView === 'watermark' && <WatermarkWorkspace onWorkflowSuccess={handleWorkflowSuccess} />}
+              {currentView === 'metadata' && <MetadataWorkspace onWorkflowSuccess={handleWorkflowSuccess} />}
+              {currentView === 'media' && <MediaRedactorWorkspace onWorkflowSuccess={handleWorkflowSuccess} />}
               {currentView === 'docs' && <DocsWorkspace />}
               {currentView === 'legal' && <LegalWorkspace />}
               {currentView === 'about' && <AboutWorkspace />}
@@ -424,6 +433,14 @@ export function App() {
               Feedback
             </button>
             <a
+              href="https://razorpay.me/@poorvithmp"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-[var(--text)] text-[var(--accent)] font-semibold"
+            >
+              Sponsor
+            </a>
+            <a
               href="https://github.com/poorvith-mp/aiscrubber"
               target="_blank"
               rel="noreferrer"
@@ -434,6 +451,8 @@ export function App() {
           </div>
         </div>
       </footer>
+
+      <SponsorshipModal event={sponsorshipEvent} onClose={() => setSponsorshipEvent(null)} />
 
       {/* Feedback Modal */}
       <FeedbackModal

@@ -1,4 +1,5 @@
 import { scrubBuiltIns } from './scrubCore.js';
+import { restoreSessionText } from './sessionCore.js';
 
 export type EnhancementGoal = 'coding' | 'debugging' | 'analysis' | 'writing' | 'general';
 
@@ -29,6 +30,33 @@ export interface ReconstructResult {
   reconstructedText: string;
   restoredCount: number;
   unresolvedPlaceholders: string[];
+}
+
+export interface RoundTripMaskResult {
+  maskedText: string;
+  sessionKey: {
+    format: 'aiscrubber-session';
+    version: 2;
+    variables: Array<{ placeholder: string; original: string; detectorId: string }>;
+  };
+  isCurrent(source: string): boolean;
+}
+
+export function maskPromptForRoundTrip(rawPrompt: string): RoundTripMaskResult {
+  const scrubbed = scrubBuiltIns(rawPrompt, undefined, { tokenStyle: 'brace' });
+  return {
+    maskedText: scrubbed.text,
+    sessionKey: {
+      format: 'aiscrubber-session',
+      version: 2,
+      variables: scrubbed.mappings.map(({ token, original, detectorId }) => ({
+        placeholder: token,
+        original,
+        detectorId,
+      })),
+    },
+    isCurrent: (source) => source === rawPrompt,
+  };
 }
 
 export function enhanceAndMaskPrompt(
@@ -91,7 +119,7 @@ function categoryForDetector(detectorId: string): PromptVariable['category'] {
   return 'secret';
 }
 
-function formatEnhancedPrompt(body: string, goal: EnhancementGoal): string {
+export function formatEnhancedPrompt(body: string, goal: EnhancementGoal): string {
   switch (goal) {
     case 'coding':
       return `[TASK DIRECTIVE]
@@ -170,40 +198,12 @@ ${body.trim()}
 
 export function reconstructAiResponse(
   aiResponseText: string,
-  sessionKey: PromptSessionKey | PromptVariable[]
+  sessionKey: PromptSessionKey | PromptVariable[] | unknown
 ): ReconstructResult {
-  let reconstructed = aiResponseText;
-  let restoredCount = 0;
-  const vars: PromptVariable[] = Array.isArray(sessionKey)
-    ? sessionKey
-    : sessionKey.variables || [];
-
-  for (const v of vars) {
-    if (!v.placeholder || !v.original) continue;
-
-    // Support {{TOKEN}}, {TOKEN}, and [TOKEN] matching in AI response
-    const variations = [
-      v.placeholder,
-      v.placeholder.replace(/^\{\{/, '{').replace(/\}\}$/, '}'),
-      v.placeholder.replace(/^\{\{/, '[').replace(/\}\}$/, ']'),
-    ];
-
-    for (const variant of variations) {
-      if (reconstructed.includes(variant)) {
-        const occurrences = reconstructed.split(variant).length - 1;
-        reconstructed = reconstructed.split(variant).join(v.original);
-        restoredCount += occurrences;
-      }
-    }
-  }
-
-  // Check if any leftover placeholders remain
-  const leftoverMatch = reconstructed.match(/\{\{[A-Z0-9_]+\}\}/g) || [];
-  const unresolvedPlaceholders = Array.from(new Set(leftoverMatch));
-
+  const restored = restoreSessionText(aiResponseText, sessionKey);
   return {
-    reconstructedText: reconstructed,
-    restoredCount,
-    unresolvedPlaceholders,
+    reconstructedText: restored.text,
+    restoredCount: restored.restoredCount,
+    unresolvedPlaceholders: restored.unresolvedPlaceholders,
   };
 }

@@ -17,7 +17,7 @@ describe('scrubText', () => {
       slack: ['xox', 'b-', '123456789012-123456789012-abcdefghijklmnopqrstuvwx'].join(''),
       awsId: ['AK', 'IA', 'IOSFODNN7EXAMPLE'].join(''),
       jwt: ['ey', 'JhbGciOiJIUzI1NiJ9.', 'eyJzdWIiOiIxMjM0NTY3ODkwIn0.', 'abcdefghijklmnopqrstuv'].join(''),
-      privateKey: ['-----BEGIN ', 'PRIVATE KEY-----'].join(''),
+      privateKey: ['-----BEGIN ', 'PRIVATE KEY-----\nsynthetic\n-----END PRIVATE KEY-----'].join(''),
     };
     const source = [
       `OpenAI ${synthetic.openai}`,
@@ -61,9 +61,12 @@ describe('scrubText', () => {
     expect(restoreTextWithMapping(result.text, result.mappings)).toBe(source);
   });
 
-  test('keeps disabled detectors and malformed custom expressions unchanged', () => {
-    const result = scrubText('a@example.com ticket ALPHA-42', new Set(), [
+  test('keeps disabled detectors unchanged and rejects malformed custom expressions', () => {
+    expect(() => scrubText('a@example.com ticket ALPHA-42', new Set(), [
       { id: 'bad', label: 'Bad', token: 'BAD', patternString: '[', isRegex: true, enabled: true },
+      { id: 'ticket', label: 'Ticket', token: 'TICKET', patternString: 'ALPHA-42', isRegex: false, enabled: true },
+    ])).toThrow(/regular expression/i);
+    const result = scrubText('a@example.com ticket ALPHA-42', new Set(), [
       { id: 'ticket', label: 'Ticket', token: 'TICKET', patternString: 'ALPHA-42', isRegex: false, enabled: true },
     ]);
     expect(result.text).toBe('a@example.com ticket [TICKET_1]');
@@ -77,7 +80,7 @@ describe('scrubText', () => {
     expect(isValidIpv6('1:2:3:4:5:6:7:8')).toBe(true);
     expect(isValidIpv6('1:2:3:4:5:6:7')).toBe(false);
     expect(isValidIpv6('1::2::3')).toBe(false);
-    expect(scrubBuiltIns('')).toEqual({ text: '', counts: {}, mappings: [], diffSegments: [], totalRedactions: 0 });
+    expect(scrubBuiltIns('')).toEqual({ text: '', counts: {}, mappings: [], diffSegments: [], acceptedMatches: [], totalRedactions: 0 });
   });
 
   test('supports regex custom rules and ignores empty definitions', () => {

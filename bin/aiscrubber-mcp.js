@@ -21,11 +21,12 @@ const rl = readline.createInterface({
   terminal: false,
 });
 
-rl.on('line', (line) => {
+rl.on('line', async (line) => {
   if (!line.trim()) return;
   try {
+    if (Buffer.byteLength(line, 'utf8') > 80 * 1024 * 1024) throw new Error('Request exceeds 80 MiB');
     const parsed = JSON.parse(line);
-    const response = handleMessage(parsed);
+    const response = await handleMessage(parsed);
     if (response && parsed.id !== undefined) {
       process.stdout.write(JSON.stringify(response) + '\n');
     }

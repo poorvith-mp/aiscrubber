@@ -24,7 +24,7 @@ auth_key: Kj7mN9vP2xR5sT8TokenProduction
 aws_secret_access_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 secret: 1234567890abcdef1234567890abcdef12345678
 DB_PASS="S3cur3P@ssw0rd!2026"
------BEGIN RSA PRIVATE KEY-----
+-----BEGIN RSA PRIVATE KEY-----synthetic-----END RSA PRIVATE KEY-----
 SESSION_TOKEN = "AbCdEf123456G7H8I9J0K1L2M3N4O5P6"
 key = "fedcba9876543210fedcba9876543210"
 token="8f7e6d5c4b3a20198f7e6d5c4b3a2019"

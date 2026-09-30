@@ -6,6 +6,67 @@ import { describe, expect, test } from 'vitest';
 import { runCheck } from '../bin/lib/checkCommand.js';
 
 describe('check command', () => {
+  test('scans staged index content instead of the working tree', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aiscrub-git-index-'));
+    try {
+      spawnSync('git', ['init'], { cwd: tempDir });
+      const testFile = path.join(tempDir, 'message.txt');
+      fs.writeFileSync(testFile, 'person@example.com\n', 'utf8');
+      spawnSync('git', ['add', '--', 'message.txt'], { cwd: tempDir });
+      fs.writeFileSync(testFile, 'clean working tree\n', 'utf8');
+      const before = spawnSync('git', ['diff', '--cached', '--binary'], { cwd: tempDir, encoding: 'utf8' }).stdout;
+
+      const code = await runCheck({ staged: true, cwd: tempDir });
+
+      expect(code).toBe(1);
+      expect(fs.readFileSync(testFile, 'utf8')).toBe('clean working tree\n');
+      expect(spawnSync('git', ['diff', '--cached', '--binary'], { cwd: tempDir, encoding: 'utf8' }).stdout).toBe(before);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('ignores sensitive working-tree edits when the staged blob is clean', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aiscrub-git-index-'));
+    try {
+      spawnSync('git', ['init'], { cwd: tempDir });
+      const testFile = path.join(tempDir, 'message.txt');
+      fs.writeFileSync(testFile, 'clean staged text\n', 'utf8');
+      spawnSync('git', ['add', '--', 'message.txt'], { cwd: tempDir });
+      fs.writeFileSync(testFile, 'person@example.com\n', 'utf8');
+
+      expect(await runCheck({ staged: true, cwd: tempDir })).toBe(0);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  test('reads staged blobs for paths with spaces, Unicode, and leading dashes', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aiscrub-git-paths-'));
+    try {
+      spawnSync('git', ['init'], { cwd: tempDir });
+      for (const name of ['space name.txt', 'नमस्ते.txt', '-leading.txt']) {
+        fs.writeFileSync(path.join(tempDir, name), `${name}@example.com\n`, 'utf8');
+        spawnSync('git', ['add', '--', name], { cwd: tempDir });
+        fs.writeFileSync(path.join(tempDir, name), 'clean\n', 'utf8');
+      }
+
+      let captured = '';
+      const original = console.log;
+      console.log = (value) => { captured += `${value}\n`; };
+      const code = await runCheck({ staged: true, json: true, cwd: tempDir });
+      console.log = original;
+
+      expect(code).toBe(1);
+      const parsed = JSON.parse(captured);
+      expect(parsed.summary.files).toBe(3);
+      expect(parsed.summary.findings).toBe(3);
+      expect(parsed.findings.map((item) => item.path).sort()).toEqual(['-leading.txt', 'space name.txt', 'नमस्ते.txt'].sort());
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   test('refuses --staged when not in a git repo with exit code 2', async () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aiscrub-nongit-'));
     try {
@@ -32,7 +93,7 @@ describe('check command', () => {
 
       expect(code).toBe(1);
       expect(logged).toContain('file.ts:1:14');
-      expect(logged).toContain('sk****45');
+      expect(logged).toContain('[REDACTED]');
       expect(logged).not.toContain('0123456789abcdef'); // Original value never printed!
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
@@ -86,8 +147,8 @@ describe('check command', () => {
       const code = await runCheck({ staged: true, cwd: tempDir });
       process.stderr.write = origErr;
 
-      expect(code).toBe(0);
-      expect(errOutput).toContain('warning: skipping large.txt (> 5 MiB)');
+      expect(code).toBe(2);
+      expect(errOutput).toContain('large.txt');
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
@@ -114,7 +175,7 @@ describe('check command', () => {
       expect(parsed.summary.files).toBe(1);
       expect(parsed.summary.findings).toBe(1);
       expect(parsed.findings[0].path).toBe('secret.js');
-      expect(parsed.findings[0].preview).toContain('gh****uv');
+      expect(parsed.findings[0].preview).toBe('[REDACTED]');
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }

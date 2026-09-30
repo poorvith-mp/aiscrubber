@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { ToolView } from '../lib/navigation';
+import { scrubBuiltIns } from '../lib/scrubCore.js';
+import { DEMO_SCENARIOS } from '../lib/demoScenarios';
 
 interface HomeWorkspaceProps {
   onSelectTool: (tool: ToolView) => void;
@@ -49,11 +51,7 @@ Database URL: postgresql://admin_user:P@ssw0rd9988@db.internal.acme.corp:5432/ma
 Auth Header: Bearer sk-live-998811223344556677889900aabbccdd
 Contact Customer: alex.rivas@acme.corp (Card: 4532-8899-1122-3344)`;
 
-  const demoScrubbedText = `// Production Incident Crash Dump
-Host: [IP_1] | Environment: AWS_PROD
-Database URL: postgresql://[SECRET_1]
-Auth Header: Bearer [SECRET_2]
-Contact Customer: [EMAIL_1] (Card: [CARD_1])`;
+  const demoScrubbedText = scrubBuiltIns(demoRawText).text;
 
   return (
     <div className="space-y-16 py-4 sm:py-8">
@@ -223,6 +221,13 @@ Contact Customer: [EMAIL_1] (Card: [CARD_1])`;
         </div>
       </section>
 
+      <section aria-label="Engine demonstrations" className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {DEMO_SCENARIOS.map((scenario) => <article key={scenario.id} className="p-4 border border-[var(--line)] rounded-xl">
+          <h3 className="font-bold">{scenario.title}</h3>
+          <details className="text-xs my-3"><summary>Inspect real engine input and output</summary><pre className="whitespace-pre-wrap">{scenario.input}</pre><pre className="whitespace-pre-wrap mt-3">{scenario.output}</pre></details>
+          <a className="btn-secondary text-xs" href={`/?demo=${scenario.id}#${scenario.workspace}`}>Open prefilled workspace</a>
+        </article>)}
+      </section>
       {/* 5 CORE ENGINES BENTO GRID */}
       <section className="space-y-6 max-w-5xl mx-auto">
         <div className="text-center space-y-2">

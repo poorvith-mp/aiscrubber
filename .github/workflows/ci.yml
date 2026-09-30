@@ -11,17 +11,22 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [18, 20, 22, 24]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: ${{ matrix.node-version }}
           cache: npm
       - run: npm ci
       - run: npm test
       - run: npm run test:coverage
       - run: npm run build
+      - run: node tests/package-smoke.mjs
       - uses: actions/upload-artifact@v4
         with:
-          name: coverage
+          name: coverage-node-${{ matrix.node-version }}
           path: coverage/
